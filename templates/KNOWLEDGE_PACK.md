@@ -35,7 +35,7 @@ The onboarding article. Chat-AI is advice; agentic AI is execution. The loop is 
 ## Priority 3 — Retrieval and pattern reuse
 
 **[What Would Vin Claudel Do](https://trilogyai.substack.com/p/what-would-vin-claudel-do)** · *Trilogy AI COE*
-Mine proven implementations for exact constants; don't invent with prose. `npx wwvcd` serves 1,166 patterns from Claude Code's TS source.
+Mine proven implementations for exact constants; don't invent with prose. `npx wwvcd` serves 1,191 technical findings from Claude Code source per the author.
 **Read when:** you catch yourself about to write "be strict" in a prompt. Search first.
 
 ---

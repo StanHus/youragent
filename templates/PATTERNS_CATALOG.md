@@ -50,6 +50,9 @@ Pattern IDs: `P-<ARTICLE>-<NN>`. First section prefix = article:
 
 ## How to Fix Your AI Agents Skipping Steps · [source](https://trilogyai.substack.com/p/how-to-fix-your-ai-agents-keep-cutting)
 
+*Note: the "Beads" tool cited throughout this article is [Steve Yegge's Beads](https://github.com/steveyegge/beads) — a Go CLI built on Dolt. This bootstrap's `bd-lite.sh` is a markdown-file fallback that preserves Yegge's claim-execute-close-with-evidence semantics.*
+
+
 - **P-CUT-01** — Internalize: LLMs predict completions, they don't execute checklists. Solution is architectural, not prompting.
 - **P-CUT-02** — Completion-prediction failure: plausible stopping point feels like valid completion.
 - **P-CUT-03** — Attention-decay failure: later steps in long prompts compete for attention and lose.
@@ -97,7 +100,7 @@ Pattern IDs: `P-<ARTICLE>-<NN>`. First section prefix = article:
 ## What Would Vin Claudel Do · [source](https://trilogyai.substack.com/p/what-would-vin-claudel-do)
 
 - **P-WWVCD-01** — Before designing from scratch, search existing proven implementations for exact constants.
-- **P-WWVCD-02** — Default retrieval: `npx wwvcd "topic" --json` — 1,166 patterns from Claude Code TS source.
+- **P-WWVCD-02** — Default retrieval: `npx wwvcd "topic" --json` — 1,191 technical findings from Claude Code source per the author (Stan Huseletov).
 - **P-WWVCD-03** — For long-running bash, reuse the blueprint: `ASSISTANT_BLOCKING_BUDGET_MS` + CircularBuffer + platform sandboxing. Never "run async" in a prompt.
 - **P-WWVCD-04** — For judge hallucination, require `evidence_quote` output field + strip write perms from evaluator. Never "BE STRICT" in a prompt.
 - **P-WWVCD-05** — Claims without evidence blocks = automatic fabrication.

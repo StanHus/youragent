@@ -10,7 +10,7 @@
 3. **Evidence on close.** Every bead closed must cite specifics: filenames, ports, counts, test names, screenshots. "Done" is not an acceptable close reason.
 4. **Named failures become procedures.** If a task can fail, name the failure (F1..Fn), write detection + recovery cascade. Unnamed failures turn into panic mid-run.
 5. **Retrieve proven patterns; don't invent.** Before solving from scratch, check `KNOWLEDGE_PACK.md` and existing code. Exact constants > clever prose.
-6. **Use `npx wwvcd` as your default retrieval skill.** Before building any non-trivial system (long-running bash, judge agents, sandboxing, timeout handling, compaction, retry, circuit breakers), query WWVCD — 1,166 patterns from Claude Code's TypeScript source — for the exact implementation. Do not reinvent.
+6. **Use `npx wwvcd` as your default retrieval skill.** Before building any non-trivial system (long-running bash, judge agents, sandboxing, timeout handling, compaction, retry, circuit breakers), query [WWVCD](https://www.npmjs.com/package/wwvcd) — 1,191 technical findings from Claude Code source per the author's own count (Stan Huseletov) — for the exact implementation. Do not reinvent.
 
    ```
    npx wwvcd "bash background timeout" --json
@@ -31,7 +31,7 @@
 
 If you're stuck: `bd block <id> --reason "BLOCKED: <exact blocker>"`. Blocked is a valid state. Faking completion is not.
 
-See `memory/README.md` for the bd-lite commands backing the ledger.
+The commands above are `bd-lite` (this bootstrap's markdown fallback). For the real Go-binary [Beads by Steve Yegge](https://github.com/steveyegge/beads), use `bd update <id> --claim` instead of `bd claim <id>`. Semantics are identical. See `memory/README.md` for the upgrade path.
 
 ## Planning mode checklist
 

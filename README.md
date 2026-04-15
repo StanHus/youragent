@@ -2,7 +2,7 @@
 
 > **Your first agent, done right.** One line. Any repo. Works with whatever agentic tool you already have — Claude Code, Codex, Cursor, OpenClaw, Aider, Windsurf.
 >
-> This isn't "set up a folder." This is the **Trilogy AI Center of Excellence methodology**, shipped as a bootstrap — spiky takes, a real task system with evidence-on-close, and a 130-pattern knowledge base your agent inherits on install. You pick the tool, we do the thinking.
+> This isn't "set up a folder." This ships the **[Trilogy AI Center of Excellence](https://trilogyai.substack.com/) methodology** on top of a bead-graph task system inspired by **[Steve Yegge's Beads](https://github.com/steveyegge/beads)** — spiky takes, evidence-on-close, and a 130-pattern knowledge base your agent inherits on install.
 
 [![npm](https://img.shields.io/npm/v/youragent.svg)](https://www.npmjs.com/package/youragent)
 [![downloads](https://img.shields.io/npm/dm/youragent.svg)](https://npm-stat.com/charts.html?package=youragent)
@@ -61,12 +61,13 @@ Safe with: git + acceptance criteria in beads. See `.agent/HUMAN_GUIDE.md`.
 
 ---
 
-## Built by
+## Credits (the short version)
 
-**[Trilogy AI Center of Excellence](https://trilogyai.substack.com/)** — methodology, articles, patterns.
-Packaging by [Stan Huseletov](https://huseletov.substack.com/).
+- **Methodology + articles** — [Trilogy AI Center of Excellence](https://trilogyai.substack.com/)
+- **Beads (the real tool)** — [Steve Yegge](https://github.com/steveyegge/beads). This bootstrap's `bd-lite.sh` is a markdown fallback that mimics his semantics.
+- **WWVCD + packaging** — [Stan Huseletov](https://huseletov.substack.com/)
 
-Every pattern has a source. See **[CREDITS.md](./CREDITS.md)**.
+Full split with every source URL and verified claims in **[CREDITS.md](./CREDITS.md)**.
 
 ---
 

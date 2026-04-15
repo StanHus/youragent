@@ -14,8 +14,8 @@ If your tool is missing one of these, the agent degrades gracefully and logs the
 
 ## Retrieval skills (constant)
 
-- **`npx wwvcd`** — 1,166 architectural patterns from Claude Code TS source. Use for: bash timeouts, sandboxing, judge agents, compaction, retry logic, circuit breakers, permission handling. Default retrieval skill before inventing.
-  - GitHub: https://github.com/StanHus/WWVCD
+- **`npx wwvcd`** — technical findings from Claude Code source (1,191 per the author). Use for: bash timeouts, sandboxing, judge agents, compaction, retry logic, circuit breakers, permission handling. Default retrieval skill before inventing.
+  - Author: Stan Huseletov · GitHub: https://github.com/StanHus/WWVCD · NPM: https://www.npmjs.com/package/wwvcd
   - Usage: `npx wwvcd "your query" --json`
 
 ## Memory tools (constant)
@@ -30,11 +30,11 @@ If your tool is missing one of these, the agent degrades gracefully and logs the
 ## Recommended (human installs when ready)
 
 - **GOG CLI** (https://gogcli.sh/) — Google Workspace access (Gmail, Docs, Sheets, Calendar). See `GOGCLI_STARTER.md` for setup. Required for email-driven agent loops.
-- **Beads proper** — distributed graph issue tracker on Dolt (replaces bd-lite if you want multi-agent coordination).
+- **Beads** by Steve Yegge — the real distributed graph issue tracker on Dolt. Replaces `bd-lite` when you want multi-agent coordination, git-based sync, or a real database. Install: `brew install beads` or `npm install -g @beads/bd`. GitHub: https://github.com/steveyegge/beads.
 
 ## MCP servers (optional)
 
-- **`briefing-pack`** — if installed, serves distilled knowledge from the 13-article pack over MCP (see `/Users/stanhus/briefing-pack/` for reference).
+Any MCP server works in this repo by default — nothing in `.agent/` assumes a specific MCP config.
 
 ## Tool sanity check on session start
 

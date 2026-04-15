@@ -1,10 +1,17 @@
 # Credits
 
-## Primary authorship
+## Authorship split
 
-The methodology this bootstrap ships — the planning discipline, the bead-graph task system, the memory architecture, the anti-shortcut rules, the retrieval-before-invention principle — is the work of the **[Trilogy AI Center of Excellence](https://trilogyai.substack.com/)**. Every pattern in `templates/PATTERNS_CATALOG.md` has an exact source URL in the COE publication or adjacent author sites. This package is the delivery mechanism. The ideas are theirs.
+Three distinct sources contributed to this bootstrap. Attributing each explicitly.
 
-Packaging, install flow, and the `bd-lite` markdown-bead fallback by [Stan Huseletov](https://huseletov.substack.com/).
+### The methodology — [Trilogy AI Center of Excellence](https://trilogyai.substack.com/)
+Planning discipline, memory architecture, anti-shortcut rules, retrieval-before-invention, 9-section compaction, tier-ranked insights, and the broader agentic-development playbook come from the COE publication. Every pattern in `templates/PATTERNS_CATALOG.md` has an exact source URL.
+
+### The bead-graph task system — [Steve Yegge](https://github.com/steveyegge)
+**Beads** (the real tool this bootstrap's `bd-lite.sh` mimics) is by Steve Yegge: [github.com/steveyegge/beads](https://github.com/steveyegge/beads). It's a Go CLI built on Dolt, published as both a Homebrew formula and `@beads/bd` on npm. The Trilogy AI article "How to Fix Your AI Agents Skipping Steps" popularized its use for agent orchestration, but the tool itself is Yegge's work. When this bootstrap's users outgrow the markdown `bd-lite`, the upgrade path is Yegge's Beads proper.
+
+### Packaging + `bd-lite` fallback — [Stan Huseletov](https://huseletov.substack.com/)
+Install flow, template wiring, personality-first `SOUL.md`, the markdown-based `bd-lite.sh` that preserves Beads' claim-execute-close-with-evidence semantics without requiring the Go binary, and the [WWVCD](https://www.npmjs.com/package/wwvcd) retrieval skill referenced from `TOOLS.md`.
 
 If you use or fork this, keep these attributions visible. When the agent applies one of these ideas in a response, it cites the source — that's encoded as a rule in `templates/AGENT.md` and `skills-scaffold/README.md`.
 
@@ -26,7 +33,7 @@ Every file in `templates/` draws from one or more of these. The author of each a
    Every Claude Code constraint as a response to a production failure. 13k compaction buffer, denial circuit breakers, read-before-edit, CLAUDE.md tier order. Appendix of `AGENT.md`.
 
 4. **[What Would Vin Claudel Do](https://trilogyai.substack.com/p/what-would-vin-claudel-do)**
-   Mine proven implementations for exact constants; don't invent with prose. WWVCD (1,166 patterns from Claude Code TS source) as default retrieval skill. Baked into `AGENT.md` prime directive #6 and `TOOLS.md`.
+   Mine proven implementations for exact constants; don't invent with prose. WWVCD (1,191 findings from Claude Code source per the author) as default retrieval skill. Baked into `AGENT.md` prime directive #6 and `TOOLS.md`.
 
 5. **[Postmortem: When Your AI Tools OpenClaw](https://trilogyai.substack.com/p/postmortem-when-your-ai-tools-openclaw)**
    Redundancy = resilience. Search exact error strings first. Meta-debugging as valid resilience pattern. `AGENT.md` § "Debugging AI tools".
@@ -64,9 +71,10 @@ Every file in `templates/` draws from one or more of these. The author of each a
 
 ## Tools referenced
 
-- **[WWVCD](https://github.com/StanHus/WWVCD)** — 1,166 architectural patterns from Claude Code's TypeScript source. Installed and used as the default retrieval skill in `AGENT.md`. Maintainer: [@StanHus](https://github.com/StanHus). NPM: [wwvcd](https://www.npmjs.com/package/wwvcd).
+- **[Beads (bd)](https://github.com/steveyegge/beads)** — distributed graph issue tracker built on Dolt, by **Steve Yegge**. This is the real tool. Published on Homebrew (`brew install beads`) and npm (`npm install -g @beads/bd`). Yegge's announcement: [steve-yegge.medium.com/introducing-beads-a-coding-agent-memory-system](https://steve-yegge.medium.com/introducing-beads-a-coding-agent-memory-system-637d7d92514a).
+  `bd-lite.sh` in this bootstrap is a markdown-file fallback that mimics the semantics (atomic claim → close-with-evidence, dependency ordering) without the Go binary. Upgrade path documented in `memory/README.md` — point it at Yegge's repo.
 
-- **Beads** — distributed graph issue tracker on Dolt (version-controlled SQL). Originated in the Trilogy AI ecosystem. `bd-lite.sh` in this bootstrap is a markdown-file fallback that preserves the semantics (atomic claim → close-with-evidence, dependency ordering) without requiring the full install. Upgrade path documented in `memory/README.md`.
+- **[WWVCD](https://www.npmjs.com/package/wwvcd)** — "What Would Vin Claudel Do" — CLI searchable database of technical findings extracted from Claude Code source, by [Stan Huseletov](https://github.com/StanHus). Per the v1.0.14 npm description: "1,191 deep technical findings." Installed via `npx wwvcd "query" --json`. The "1,191 patterns" figure comes from the author's own count; this bootstrap doesn't independently verify it — trust the source or your own inspection.
 
 - **[GOG CLI](https://gogcli.sh/)** — Google Workspace CLI. Referenced as the on-ramp to personal-agent territory in `GOGCLI_STARTER.md`.
 
@@ -93,4 +101,17 @@ This is not decorative. It's how the human you're working with learns where the 
 
 ---
 
-*If you authored one of these articles and want the attribution phrased differently, open an issue on this repo.*
+*If you authored one of these articles or tools and want the attribution phrased differently, open an issue on this repo.*
+
+---
+
+## What this bootstrap does NOT claim to verify
+
+Honesty about scope:
+
+- **Specific constants** cited from the "How to Use Claude Code like a Claude Code Engineer" article (13,000-token compaction buffer, 23 bash injection checks, 3 consecutive denial limit, etc.) reflect the article author's reverse-engineering of Claude Code's TypeScript source. This bootstrap inherits those claims without independently re-reading Claude Code's source.
+- **WWVCD's 1,191-pattern count** is per the author's npm description. Not independently audited here.
+- **OpenClaw** as a named framework is referenced throughout the Trilogy articles; where this bootstrap uses OpenClaw conventions (e.g., the 8 auto-loaded filenames), those are the article authors' conventions. If you don't use OpenClaw, the convention still reads fine in Claude Code / Cursor / Codex / Aider — they're just plain markdown files.
+- **Individual article dates** in the 2026 range look "future" to some automated tools whose training predates the publication window — they're real and current per the Trilogy archive.
+
+Submit issues on this repo if anything here looks off.
