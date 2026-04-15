@@ -13,7 +13,11 @@
 ## Install
 
 ```bash
+# Recommended:
 npx youragent
+
+# Fallback (no Node required):
+curl -fsSL https://raw.githubusercontent.com/stanhus/youragent/main/install.sh | bash
 ```
 
 Run it in any repo. Sixty seconds. That's it.
