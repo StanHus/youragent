@@ -22,6 +22,21 @@ curl -fsSL https://raw.githubusercontent.com/stanhus/youragent/main/install.sh |
 
 Run it in any repo. Sixty seconds. That's it.
 
+## What gets auto-wired (so your tool actually reads the scaffold)
+
+The install drops hook files at repo root that each tool auto-loads on session start:
+
+| File | Tool that reads it automatically |
+|---|---|
+| `CLAUDE.md` | Claude Code |
+| `AGENTS.md` | Codex |
+| `.cursorrules` | Cursor |
+| `.windsurfrules` | Windsurf |
+
+Each is a short redirect pointing the agent at `.agent/NORTH_STAR.md`. If you already have one of these files, it's left alone and the install prints a note so you can add the redirect yourself.
+
+For Aider, OpenClaw, or anything else: paste `"Read .agent/NORTH_STAR.md to orient"` at session start.
+
 ---
 
 ## What happens

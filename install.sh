@@ -113,6 +113,7 @@ say "  ${CYAN}4.${RESET} Install a ${BOLD}task ledger${RESET} (bd-lite) — bead
 say "  ${CYAN}5.${RESET} Drop a ${BOLD}130-pattern catalog${RESET} from 14 COE articles for the agent to absorb"
 say "  ${CYAN}6.${RESET} Add ${BOLD}skills${RESET} — substack search, source retrieval, attribution"
 say "  ${CYAN}7.${RESET} Write the ${BOLD}north star${RESET} doc every new session reads first"
+say "  ${CYAN}8.${RESET} ${BOLD}Wire auto-loads${RESET} — drop CLAUDE.md, AGENTS.md, .cursorrules, .windsurfrules so each tool reads ${BOLD}.agent/${RESET} on its own"
 hr
 
 # ---------- source resolution ----------
@@ -231,18 +232,48 @@ chmod +x "$TARGET_DIR/skills/search-substack.sh"
 
 hr
 
-# ---------- tool probes ----------
-say "${BOLD}Tool probes${RESET}"
+# ---------- tool auto-wire hooks ----------
+# Drop shim files at repo root that each agentic tool auto-reads on session start.
+# Each shim redirects the agent to .agent/NORTH_STAR.md. Skip if file already exists.
+REPO_ROOT="${TARGET_DIR%/.agent}"
+say "${BOLD}Wiring tool auto-loads (so your agent actually reads .agent/ on session start)${RESET}"
+
+hook_install() {
+  local hookfile="$1" tool="$2"
+  local dest="$REPO_ROOT/$hookfile"
+  if [ -e "$dest" ]; then
+    say "  ${YELLOW}!${RESET} $hookfile exists — left alone. Add this line yourself: ${DIM}\"See .agent/NORTH_STAR.md first.\"${RESET}"
+    return
+  fi
+  fetch_file "hooks-scaffold/$hookfile" "$dest"
+  say "  ${GREEN}✓${RESET} $hookfile ${DIM}($tool reads this automatically)${RESET}"
+}
+
+hook_install "CLAUDE.md" "Claude Code"
+hook_install "AGENTS.md" "Codex"
+hook_install ".cursorrules" "Cursor"
+hook_install ".windsurfrules" "Windsurf"
+
+hr
+
+# ---------- runtime dep probes ----------
+say "${BOLD}Runtime checks${RESET}"
+if command -v python3 >/dev/null 2>&1; then
+  say "  ${GREEN}✓${RESET} python3 available — bd-lite ready"
+else
+  say "  ${RED}!${RESET} ${BOLD}python3 not found${RESET} — bd-lite needs it. Install python3 before using the bead ledger."
+fi
+
 if command -v npx >/dev/null 2>&1; then
   say "  ${GREEN}✓${RESET} npx available — ${BOLD}npx wwvcd${RESET} retrieval skill ready"
 else
-  say "  ${YELLOW}!${RESET} npx not found — install Node.js for WWVCD retrieval (${DIM}npx wwvcd${RESET})"
+  say "  ${YELLOW}!${RESET} npx not found — install Node.js for WWVCD retrieval"
 fi
 
 if command -v git >/dev/null 2>&1; then
   say "  ${GREEN}✓${RESET} git available"
 else
-  say "  ${YELLOW}!${RESET} git missing — install for version control + repo recovery"
+  say "  ${YELLOW}!${RESET} git missing — install for version control + rollback safety"
 fi
 
 if command -v gog >/dev/null 2>&1; then
@@ -258,11 +289,11 @@ cat <<EOF
 
 ${BOLD}${GREEN}  Done. Your repo has an agent.${RESET}
 
-${BOLD}You're set. Three things to do:${RESET}
-  ${CYAN}1.${RESET} Open your agentic tool in this repo ${DIM}(Claude Code, Codex, Cursor, Aider, Windsurf, OpenClaw — any of them)${RESET}
-  ${CYAN}2.${RESET} Paste this line to the agent:
-       ${BOLD}"Read .agent/NORTH_STAR.md to orient, then ask me what I need."${RESET}
-  ${CYAN}3.${RESET} Give it a real task. Watch it close beads with evidence.
+${BOLD}You're set. Two things to do:${RESET}
+  ${CYAN}1.${RESET} Open your agentic tool in this repo ${DIM}(Claude Code / Codex / Cursor / Windsurf auto-load the scaffold via the hook files above)${RESET}
+  ${CYAN}2.${RESET} Give it a real task. Watch it close beads with evidence.
+
+${DIM}Tools without a hook file (Aider, OpenClaw, others): paste "Read .agent/NORTH_STAR.md to orient" at session start.${RESET}
 
 ${DIM}First time? Read .agent/HUMAN_GUIDE.md (2 min) and .agent/GETTING_STARTED.md (10 min).${RESET}
 ${DIM}Curious what the agent knows? .agent/PATTERNS_CATALOG.md — 130 patterns it inherited.${RESET}
