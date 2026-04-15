@@ -1,0 +1,59 @@
+{
+  "name": "youragent",
+  "version": "1.0.0",
+  "description": "Your first agent, done right. One-line bootstrap that drops a .agent/ scaffold — personality, memory, bead-graph task ledger, and a 130-pattern knowledge catalog — into any repo. Built by the Trilogy AI Center of Excellence. Tool-agnostic: Claude Code, Codex, Cursor, OpenClaw, Aider, Windsurf.",
+  "bin": {
+    "youragent": "./install.sh"
+  },
+  "scripts": {
+    "test": "NO_ANIM=1 BOOTSTRAP_TARGET=/tmp/.youragent-test-$$/.agent bash install.sh && rm -rf /tmp/.youragent-test-$$"
+  },
+  "files": [
+    "install.sh",
+    "templates/",
+    "memory-scaffold/",
+    "skills-scaffold/",
+    "README.md",
+    "CREDITS.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "agent",
+    "agentic",
+    "youragent",
+    "trilogy-ai-coe",
+    "claude-code",
+    "codex",
+    "cursor",
+    "openclaw",
+    "aider",
+    "windsurf",
+    "beads",
+    "memory",
+    "bootstrap",
+    "ai-first",
+    "developer-tools"
+  ],
+  "homepage": "https://github.com/stanhus/youragent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stanhus/youragent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stanhus/youragent/issues"
+  },
+  "author": {
+    "name": "Stan Huseletov",
+    "url": "https://huseletov.substack.com/"
+  },
+  "contributors": [
+    {
+      "name": "Trilogy AI Center of Excellence",
+      "url": "https://trilogyai.substack.com/"
+    }
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  }
+}
