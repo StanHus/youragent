@@ -13,10 +13,6 @@
 ## Install
 
 ```bash
-# The one-liner (needs only curl + bash):
-curl -fsSL https://raw.githubusercontent.com/stanhus/youragent/main/install.sh | bash
-
-# Or via npx:
 npx youragent
 ```
 
