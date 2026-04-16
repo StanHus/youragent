@@ -67,9 +67,12 @@ Run this in a repo that has `.agent/`:
 
 ```bash
 npx youragent status
+npx youragent validate
 ```
 
-You get a single-screen view: agent name + purpose, bead counts (open / blocked / done), memory facts, lessons learned, scaffold version, and one actionable next step. Read-only — nothing changes.
+`status` gives a single-screen view: agent name + purpose, bead counts (open / blocked / done), memory facts, lessons learned, scaffold version, and one actionable next step. Read-only — nothing changes.
+
+`validate` checks the scaffold is wired correctly: required files present, marker/version sane, identity can be parsed, hook files still point at `.agent/`, and the bead ledger is readable. It exits non-zero on real breakage.
 
 ## Updates are safe
 

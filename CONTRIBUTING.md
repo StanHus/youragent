@@ -41,6 +41,7 @@ Local bootstrap test:
 rm -rf /tmp/test-ya && mkdir -p /tmp/test-ya && cd /tmp/test-ya
 NO_ANIM=1 bash /path/to/youragent/install.sh
 find .agent -type f | wc -l    # expect 21
+NO_ANIM=1 bash /path/to/youragent/install.sh validate
 ```
 
 bd-lite sanity check:
@@ -51,6 +52,24 @@ cd /tmp/test-ya/.agent/memory
 ./bd-lite.sh close B0001 --reason "done"   # should FAIL (vague reason)
 ./bd-lite.sh claim B0001
 ./bd-lite.sh close B0001 --reason "Smoke test: verified CLI rejects vague close reasons"
+```
+
+Status extraction sanity check:
+
+```bash
+cat > /tmp/test-ya/.agent/IDENTITY.md <<'EOF'
+# IDENTITY.md
+
+## Name
+
+**Scribe** — maintainer agent for the youragent package itself
+
+## Purpose
+
+This agent exists to keep the youragent scaffold correct, useful, and shippable.
+EOF
+
+NO_ANIM=1 bash /path/to/youragent/install.sh status | grep 'Scribe'
 ```
 
 ## Adding a template
