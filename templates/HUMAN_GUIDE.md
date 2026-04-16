@@ -74,6 +74,27 @@ When you give it a real task, the agent:
 
 This is how good agents avoid the classic failure mode where they say "setup complete" after doing 3 of 12 steps.
 
+## Re-running the installer is always safe
+
+Run `npx youragent` in this repo whenever you want the latest scaffold. The tool splits files into two categories:
+
+- **Tool-owned** (SOUL, AGENT, KNOWLEDGE_PACK, PATTERNS_CATALOG, hooks, etc.) — refreshed every time. You get the newest version of the rules.
+- **Yours** (IDENTITY, USER, MEMORY, BEADS, LESSONS_LEARNED, PROMPTS, HANDOFF, SHORT_TERM_MEMORY) — never touched once they exist. Your agent's name, facts, task history, and mistakes are sacred.
+
+You'll see output like: `Refreshed: 14 tool-authored files. Kept safe: 8 personal files.` Re-running never breaks your setup.
+
+If you want to nuke and restart (losing everything), set `BOOTSTRAP_FORCE=1`. Rare, reserved for real mistakes.
+
+## See what your agent is up to
+
+Any time, from your repo root:
+
+```bash
+npx youragent status
+```
+
+Prints a clean box: your agent's name, purpose, how many beads are open/blocked/done, memory facts logged, lessons captured, scaffold version, and one next step. Read-only.
+
 ## What to do if it goes sideways
 
 - **Agent sounds corporate** → edit `SOUL.md`, re-emphasize the 8 vibe rules.

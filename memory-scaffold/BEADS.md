@@ -46,6 +46,7 @@ P0 > P1 > P2. P0 = foundational, must happen first. P1 = core methodology. P2 = 
 | B0024 | P2 | pending | B0003 | Absorb P-OCPRIMER-01 to P-OCPRIMER-07: OpenClaw priority-ordered learning path | — | — |
 | B0025 | P1 | pending | B0002 | Set up MEMORY.md with at least one real fact (repo purpose, infra, deadline) — prove append-only discipline | — | — |
 | B0026 | P1 | pending | B0002 | Demonstrate bead discipline: claim any bead, work, close with specifics (filenames, counts) | — | — |
+| B0027 | P1 | pending | B0002 | Absorb AGENT.md § prime directive 1 bead-discipline triggers. Apply them even when it feels small. | — | — |
 
 ## How to use this ledger
 
