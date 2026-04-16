@@ -35,7 +35,26 @@ The install drops hook files at repo root that each tool auto-loads on session s
 
 Each is a short redirect pointing the agent at `.agent/NORTH_STAR.md`. If you already have one of these files, it's left alone and the install prints a note so you can add the redirect yourself.
 
-For Aider, OpenClaw, or anything else: paste `"Read .agent/NORTH_STAR.md to orient"` at session start.
+### OpenClaw Integration
+
+If you use **[OpenClaw](https://github.com/openclaw/openclaw)** with persistent agents, the installer detects it and offers to configure all your agents automatically.
+
+When you run `npx youragent`, if `~/.openclaw/openclaw.json` exists, you'll see:
+
+```
+OpenClaw detected!
+
+Configure your OpenClaw agents to auto-read .agent/ folders?
+```
+
+Say **yes** and the installer:
+- Scans all agents from your OpenClaw config
+- Adds YourAgent integration to each agent's `AGENTS.md`
+- Configures them to automatically detect and read `.agent/` folders in any repo
+
+**Result**: Your OpenClaw agents (Junior, Scribe, etc.) will automatically combine their global identity with project-specific context from `.agent/` whenever they enter a repo.
+
+For Aider or other tools: paste `"Read .agent/NORTH_STAR.md to orient"` at session start.
 
 ---
 

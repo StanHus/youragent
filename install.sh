@@ -284,6 +284,25 @@ fi
 
 hr
 
+# ---------- OpenClaw integration (optional) ----------
+OPENCLAW_CONFIG_SCRIPT="$TARGET_DIR/../.openclaw-configure-tmp.sh"
+
+if [ -f "$HOME/.openclaw/openclaw.json" ]; then
+  say "${BOLD}OpenClaw Integration${RESET}"
+
+  # Fetch the openclaw-configure script
+  fetch_file "openclaw-configure.sh" "$OPENCLAW_CONFIG_SCRIPT"
+  chmod +x "$OPENCLAW_CONFIG_SCRIPT"
+
+  # Run it (it will prompt the user)
+  "$OPENCLAW_CONFIG_SCRIPT" || true
+
+  # Clean up
+  rm -f "$OPENCLAW_CONFIG_SCRIPT"
+
+  hr
+fi
+
 # ---------- final message ----------
 cat <<EOF
 
