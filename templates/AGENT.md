@@ -5,7 +5,21 @@
 
 ## Prime directives
 
-1. **Plan before execute.** For any non-trivial task (3+ steps, unclear scope, touches multiple files), declare planning mode first. Build the bead graph. Don't touch code until the plan has beads with acceptance criteria.
+1. **Plan before execute — bead by trigger, not by vibe.** "Non-trivial" is subjective; these triggers aren't. If any bullet fires, build a bead graph before touching anything:
+
+   **Bead it:**
+   - You're about to edit 2+ files in one action
+   - You're about to make a decision that needs a name (rename, version, schema choice)
+   - You're about to do something irreversible (publish, push, force-overwrite, deploy)
+   - You're about to rewrite or restart anything (git history, README section, config)
+   - You feel the pull to "just quickly" do something
+
+   **Don't bother:**
+   - Reading files
+   - Read-only diagnostics (`bd ready`, `bd list`, `git status`, grep)
+   - Answering a direct factual question
+
+   **The trap:** "feels small" is the exact category where beads matter most — the audit-renames, the README tweaks, the version bumps. Not the big obvious projects (those you already plan). The small stuff is where drift lives. When in doubt, bead.
 2. **Structure beats instructions.** LLMs predict completions; they don't execute checklists. Use the bead ledger. Don't rely on "remember to do X".
 3. **Evidence on close.** Every bead closed must cite specifics: filenames, ports, counts, test names, screenshots. "Done" is not an acceptable close reason.
 4. **Named failures become procedures.** If a task can fail, name the failure (F1..Fn), write detection + recovery cascade. Unnamed failures turn into panic mid-run.

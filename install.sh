@@ -8,22 +8,29 @@
 #   curl -fsSL https://raw.githubusercontent.com/stanhus/youragent/main/install.sh | bash
 #   npx youragent
 #   BOOTSTRAP_LOCAL_SRC=/path/to/repo bash install.sh   # local testing
+#
+# Re-running on a repo that already has our scaffold → safe update (your
+# personal files are preserved; only tool-authored files refresh).
+# BOOTSTRAP_FORCE=1 = nuke-and-overwrite escape hatch.
 
 set -euo pipefail
 
 # ---------- config ----------
-# Non-tech one-liner:
-#   curl -fsSL https://raw.githubusercontent.com/stanhus/youragent/main/install.sh | bash
-# Requires only: curl + bash. No git, no npm, no python (except bd-lite at runtime).
+SCAFFOLD_VERSION="1.2.0"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
 FORCE="${BOOTSTRAP_FORCE:-0}"
 NO_ANIM="${NO_ANIM:-0}"
+MARKER_FILE="$TARGET_DIR/.youragent"
 
-# File manifest — used by both local-copy and remote-curl modes.
-TEMPLATES=(SOUL AGENT IDENTITY USER TOOLS MEMORY NORTH_STAR HUMAN_GUIDE TWEAKING KNOWLEDGE_PACK PATTERNS_CATALOG GOGCLI_STARTER LESSONS_LEARNED GETTING_STARTED)
-MEMORY_FILES=(BEADS.md README.md bd-lite.sh PROMPTS.md HANDOFF.md SHORT_TERM_MEMORY.md)
+# File manifest — split by ownership.
+# SCAFFOLD = we own them, refresh on every install/update.
+# USER = we initialize once, then never touch (skip-if-exists).
+SCAFFOLD_TEMPLATES=(SOUL AGENT TOOLS NORTH_STAR HUMAN_GUIDE TWEAKING KNOWLEDGE_PACK PATTERNS_CATALOG GOGCLI_STARTER GETTING_STARTED)
+USER_TEMPLATES=(IDENTITY USER MEMORY LESSONS_LEARNED)
+SCAFFOLD_MEMORY=(README.md bd-lite.sh)
+USER_MEMORY=(BEADS.md PROMPTS.md HANDOFF.md SHORT_TERM_MEMORY.md)
 SKILLS_FILES=(search-substack.sh README.md)
 
 # ---------- colors ----------
@@ -36,24 +43,6 @@ else
 fi
 
 # ---------- animations ----------
-spin() {
-  local pid=$1 msg=$2
-  local chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-  local i=0
-  if [ "$NO_ANIM" = "1" ]; then
-    echo "  ${CYAN}→${RESET} $msg"
-    wait "$pid"
-    return
-  fi
-  while kill -0 "$pid" 2>/dev/null; do
-    i=$(( (i+1) % 10 ))
-    printf "\r  ${CYAN}%s${RESET} %s" "${chars:$i:1}" "$msg"
-    sleep 0.08
-  done
-  wait "$pid"
-  printf "\r  ${GREEN}✓${RESET} %s\n" "$msg"
-}
-
 bar() {
   local label="$1" total="${2:-20}"
   [ "$NO_ANIM" = "1" ] && { echo "  $label"; return; }
@@ -88,37 +77,63 @@ ${BOLD}${MAGENTA}
    │                                                     │
    └─────────────────────────────────────────────────────┘
 ${RESET}
-  ${DIM}You're in the right place. This takes about 60 seconds.${RESET}
   ${DIM}Nothing leaves your machine. Nothing runs in the background.${RESET}
-  ${DIM}When it's done, your repo has an agent with memory + opinions.${RESET}
 EOF
 }
 
-# ---------- preflight ----------
+# ---------- preflight + mode detection ----------
 banner
 say "${DIM}Target:${RESET} ${BOLD}${TARGET_DIR}${RESET}"
 hr
 
-if [ -e "$TARGET_DIR" ] && [ "$FORCE" != "1" ]; then
-  say "${RED}✗${RESET} ${BOLD}$TARGET_DIR already exists.${RESET}"
-  say "  Re-run with ${BOLD}BOOTSTRAP_FORCE=1${RESET} to overwrite, or ${BOLD}rm -rf $TARGET_DIR${RESET} first."
+INSTALL_MODE="fresh"
+if [ -e "$TARGET_DIR" ]; then
+  if [ "$FORCE" = "1" ]; then
+    INSTALL_MODE="force"
+  elif [ -f "$MARKER_FILE" ]; then
+    INSTALL_MODE="update"
+  else
+    INSTALL_MODE="refuse"
+  fi
+fi
+
+if [ "$INSTALL_MODE" = "refuse" ]; then
+  say "${YELLOW}!${RESET} Found an existing ${BOLD}$TARGET_DIR${RESET} folder we don't recognize."
+  say "  It's missing our marker file, so we won't touch it — your setup is safe."
+  say ""
+  say "  ${BOLD}What you can do:${RESET}"
+  say "    • Pick a different location: ${BOLD}BOOTSTRAP_TARGET=./.myagent bash install.sh${RESET}"
+  say "    • Remove the folder first: ${BOLD}rm -rf $TARGET_DIR${RESET}"
+  say "    • Back it up and re-run."
   exit 1
 fi
 
-say "${BOLD}What's about to happen (all local, all markdown):${RESET}"
-say "  ${CYAN}1.${RESET} Give your agent a ${BOLD}personality${RESET} (SOUL.md) — opinionated, brief, no corporate tone"
-say "  ${CYAN}2.${RESET} Give your agent an ${BOLD}operating manual${RESET} (AGENT.md) — plan-first, evidence-on-close"
-say "  ${CYAN}3.${RESET} Build a ${BOLD}memory system${RESET} (long-term + short-term + handoff)"
-say "  ${CYAN}4.${RESET} Install a ${BOLD}task ledger${RESET} (bd-lite) — beads with dependency + acceptance"
-say "  ${CYAN}5.${RESET} Drop a ${BOLD}130-pattern catalog${RESET} from 14 COE articles for the agent to absorb"
-say "  ${CYAN}6.${RESET} Add ${BOLD}skills${RESET} — substack search, source retrieval, attribution"
-say "  ${CYAN}7.${RESET} Write the ${BOLD}north star${RESET} doc every new session reads first"
-say "  ${CYAN}8.${RESET} ${BOLD}Wire auto-loads${RESET} — drop CLAUDE.md, AGENTS.md, .cursorrules, .windsurfrules so each tool reads ${BOLD}.agent/${RESET} on its own"
+# Mode-specific intro
+case "$INSTALL_MODE" in
+  fresh)
+    say "${BOLD}What's about to happen (all local, all markdown):${RESET}"
+    say "  ${CYAN}1.${RESET} Give your agent a ${BOLD}personality${RESET} (SOUL.md) — opinionated, brief, no corporate tone"
+    say "  ${CYAN}2.${RESET} Give your agent an ${BOLD}operating manual${RESET} (AGENT.md) — plan-first, evidence-on-close"
+    say "  ${CYAN}3.${RESET} Build a ${BOLD}memory system${RESET} (long-term + short-term + handoff)"
+    say "  ${CYAN}4.${RESET} Install a ${BOLD}task ledger${RESET} (bd-lite) — beads with dependency + acceptance"
+    say "  ${CYAN}5.${RESET} Drop a ${BOLD}130-pattern catalog${RESET} from 14 COE articles"
+    say "  ${CYAN}6.${RESET} Add ${BOLD}skills${RESET} — substack search with attribution"
+    say "  ${CYAN}7.${RESET} ${BOLD}Wire auto-loads${RESET} — CLAUDE.md / AGENTS.md / .cursorrules / .windsurfrules so your tool reads .agent/ automatically"
+    ;;
+  update)
+    say "${BOLD}${GREEN}✓${RESET} Found an existing agent (installed by youragent). Running a safe update."
+    say "  ${DIM}Scaffold files → refreshed to v${SCAFFOLD_VERSION}.${RESET}"
+    say "  ${DIM}Your personal files (IDENTITY, USER, MEMORY, BEADS, LESSONS_LEARNED, ...) → left untouched.${RESET}"
+    ;;
+  force)
+    say "${YELLOW}!${RESET} ${BOLD}BOOTSTRAP_FORCE=1${RESET} — overwriting everything including your personal files."
+    ;;
+esac
 hr
 
 # ---------- source resolution ----------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
-SOURCE_MODE=""  # "local" | "remote"
+SOURCE_MODE=""
 
 resolve_src() {
   if [ -n "$SRC_DIR" ]; then
@@ -131,7 +146,6 @@ resolve_src() {
     return
   fi
 
-  # Package-local (npx or cloned repo): script sits next to templates/
   if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/templates" ] && [ -d "$SCRIPT_DIR/memory-scaffold" ]; then
     say "${BOLD}Source:${RESET} package-local → ${SCRIPT_DIR}"
     SRC_DIR="$SCRIPT_DIR"
@@ -139,7 +153,6 @@ resolve_src() {
     return
   fi
 
-  # Remote curl mode — the non-tech one-liner path.
   say "${BOLD}Source:${RESET} remote (curl) → ${RAW_BASE}"
   if ! command -v curl >/dev/null 2>&1; then
     say "${RED}✗${RESET} curl not found. Install curl (it's on basically every system)."
@@ -148,7 +161,6 @@ resolve_src() {
   SOURCE_MODE="remote"
 }
 
-# fetch_file <repo-relative-source> <target-path>
 fetch_file() {
   local rel="$1" dest="$2"
   if [ "$SOURCE_MODE" = "local" ]; then
@@ -164,24 +176,24 @@ fetch_file() {
 resolve_src
 hr
 
-# ---------- do the work ----------
-mkdir -p "$TARGET_DIR/memory/BACKUPS" "$TARGET_DIR/memory/archives"
+# ---------- install ----------
+mkdir -p "$TARGET_DIR/memory/BACKUPS" "$TARGET_DIR/memory/archives" "$TARGET_DIR/skills"
 
 template_desc() {
   case "$1" in
-    SOUL) echo "SOUL.md (personality, 8 vibe rules)" ;;
+    SOUL) echo "SOUL.md (personality)" ;;
     AGENT) echo "AGENT.md (operating manual)" ;;
-    IDENTITY) echo "IDENTITY.md (name + purpose)" ;;
-    USER) echo "USER.md (who you are)" ;;
+    IDENTITY) echo "IDENTITY.md (your agent's name + purpose)" ;;
+    USER) echo "USER.md (about you)" ;;
     TOOLS) echo "TOOLS.md (expected + recommended tools)" ;;
-    MEMORY) echo "MEMORY.md (long-term facts, append-only)" ;;
+    MEMORY) echo "MEMORY.md (long-term facts)" ;;
     NORTH_STAR) echo "NORTH_STAR.md (session orientation)" ;;
     HUMAN_GUIDE) echo "HUMAN_GUIDE.md (read me first)" ;;
     TWEAKING) echo "TWEAKING.md (how to adjust)" ;;
-    KNOWLEDGE_PACK) echo "KNOWLEDGE_PACK.md (article index w/ attribution)" ;;
-    PATTERNS_CATALOG) echo "PATTERNS_CATALOG.md (130 patterns from 14 COE articles)" ;;
-    GOGCLI_STARTER) echo "GOGCLI_STARTER.md (Google Workspace next-step)" ;;
-    LESSONS_LEARNED) echo "LESSONS_LEARNED.md (append-only log)" ;;
+    KNOWLEDGE_PACK) echo "KNOWLEDGE_PACK.md (article index)" ;;
+    PATTERNS_CATALOG) echo "PATTERNS_CATALOG.md (130 patterns)" ;;
+    GOGCLI_STARTER) echo "GOGCLI_STARTER.md (Google Workspace on-ramp)" ;;
+    LESSONS_LEARNED) echo "LESSONS_LEARNED.md (mistake log)" ;;
     GETTING_STARTED) echo "GETTING_STARTED.md (agentic onboarding)" ;;
     *) echo "$1.md" ;;
   esac
@@ -192,8 +204,8 @@ memory_desc() {
     BEADS.md) echo "memory/BEADS.md (task ledger)" ;;
     README.md) echo "memory/README.md (bead rules)" ;;
     bd-lite.sh) echo "memory/bd-lite.sh (bead CLI)" ;;
-    PROMPTS.md) echo "memory/PROMPTS.md (human-instruction log)" ;;
-    HANDOFF.md) echo "memory/HANDOFF.md (session-to-session state)" ;;
+    PROMPTS.md) echo "memory/PROMPTS.md (instruction log)" ;;
+    HANDOFF.md) echo "memory/HANDOFF.md (session handoff)" ;;
     SHORT_TERM_MEMORY.md) echo "memory/SHORT_TERM_MEMORY.md (scratch pad)" ;;
     *) echo "memory/$1" ;;
   esac
@@ -201,48 +213,97 @@ memory_desc() {
 
 skill_desc() {
   case "$1" in
-    search-substack.sh) echo "skills/search-substack.sh (source article retrieval)" ;;
-    README.md) echo "skills/README.md (skill rules + attribution)" ;;
+    search-substack.sh) echo "skills/search-substack.sh (source retrieval)" ;;
+    README.md) echo "skills/README.md (skill rules)" ;;
     *) echo "skills/$1" ;;
   esac
 }
 
-say "${BOLD}Installing templates${RESET}"
-for t in "${TEMPLATES[@]}"; do
-  bar "$(template_desc "$t")" 12
+# install_file <source-rel-path> <dest-path> <is_user_file>
+# USER files are skip-if-exists unless FORCE=1.
+install_file() {
+  local rel="$1" dest="$2" is_user="$3"
+  if [ "$is_user" = "1" ] && [ -f "$dest" ] && [ "$FORCE" != "1" ]; then
+    return 1  # skipped
+  fi
+  fetch_file "$rel" "$dest"
+  return 0  # installed
+}
+
+COUNT_REFRESHED=0
+COUNT_KEPT=0
+COUNT_INSTALLED=0
+
+say "${BOLD}Installing scaffold (tool-owned files)${RESET}"
+for t in "${SCAFFOLD_TEMPLATES[@]}"; do
+  bar "$(template_desc "$t")" 10
   fetch_file "templates/${t}.md" "$TARGET_DIR/${t}.md"
+  COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
 
-hr
-say "${BOLD}Initializing memory scaffold${RESET}"
-for f in "${MEMORY_FILES[@]}"; do
-  bar "$(memory_desc "$f")" 10
+for f in "${SCAFFOLD_MEMORY[@]}"; do
+  bar "$(memory_desc "$f")" 8
   fetch_file "memory-scaffold/${f}" "$TARGET_DIR/memory/${f}"
+  COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
 chmod +x "$TARGET_DIR/memory/bd-lite.sh"
 
-hr
-say "${BOLD}Installing skills${RESET}"
-mkdir -p "$TARGET_DIR/skills"
 for f in "${SKILLS_FILES[@]}"; do
-  bar "$(skill_desc "$f")" 10
+  bar "$(skill_desc "$f")" 8
   fetch_file "skills-scaffold/${f}" "$TARGET_DIR/skills/${f}"
+  COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
 chmod +x "$TARGET_DIR/skills/search-substack.sh"
 
 hr
+if [ "$INSTALL_MODE" = "update" ]; then
+  say "${BOLD}Checking your personal files (we don't touch these)${RESET}"
+else
+  say "${BOLD}Initializing your personal files (one-time, we'll never touch these again)${RESET}"
+fi
+
+for t in "${USER_TEMPLATES[@]}"; do
+  dest="$TARGET_DIR/${t}.md"
+  if install_file "templates/${t}.md" "$dest" "1"; then
+    bar "$(template_desc "$t")" 8
+    COUNT_INSTALLED=$((COUNT_INSTALLED+1))
+  else
+    say "  ${DIM}· kept:${RESET} $(template_desc "$t")"
+    COUNT_KEPT=$((COUNT_KEPT+1))
+  fi
+done
+
+for f in "${USER_MEMORY[@]}"; do
+  dest="$TARGET_DIR/memory/${f}"
+  if install_file "memory-scaffold/${f}" "$dest" "1"; then
+    bar "$(memory_desc "$f")" 8
+    COUNT_INSTALLED=$((COUNT_INSTALLED+1))
+  else
+    say "  ${DIM}· kept:${RESET} $(memory_desc "$f")"
+    COUNT_KEPT=$((COUNT_KEPT+1))
+  fi
+done
+
+# Write marker
+printf "youragent-scaffold\nversion=%s\ninstalled=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MARKER_FILE"
+
+hr
 
 # ---------- tool auto-wire hooks ----------
-# Drop shim files at repo root that each agentic tool auto-reads on session start.
-# Each shim redirects the agent to .agent/NORTH_STAR.md. Skip if file already exists.
 REPO_ROOT="${TARGET_DIR%/.agent}"
-say "${BOLD}Wiring tool auto-loads (so your agent actually reads .agent/ on session start)${RESET}"
+say "${BOLD}Wiring tool auto-loads${RESET}"
 
 hook_install() {
   local hookfile="$1" tool="$2"
   local dest="$REPO_ROOT/$hookfile"
   if [ -e "$dest" ]; then
-    say "  ${YELLOW}!${RESET} $hookfile exists — left alone. Add this line yourself: ${DIM}\"See .agent/NORTH_STAR.md first.\"${RESET}"
+    if grep -qE "youragent|NORTH_STAR\.md|\.agent/" "$dest" 2>/dev/null; then
+      say "  ${GREEN}✓${RESET} $hookfile ${DIM}(already linked to the scaffold)${RESET}"
+    else
+      say "  ${YELLOW}!${RESET} $hookfile exists but doesn't reference .agent/."
+      say "     ${DIM}Add this line so $tool reads the scaffold:${RESET}"
+      say "         ${BOLD}See .agent/NORTH_STAR.md first.${RESET}"
+    fi
     return
   fi
   fetch_file "hooks-scaffold/$hookfile" "$dest"
@@ -276,41 +337,46 @@ else
   say "  ${YELLOW}!${RESET} git missing — install for version control + rollback safety"
 fi
 
-if command -v gog >/dev/null 2>&1; then
-  say "  ${GREEN}✓${RESET} gog CLI detected — Google Workspace ready"
-else
-  say "  ${DIM}·${RESET} gog CLI not installed — see ${BOLD}.agent/GOGCLI_STARTER.md${RESET} when ready"
-fi
-
 hr
 
 # ---------- final message ----------
-cat <<EOF
+if [ "$INSTALL_MODE" = "update" ]; then
+  cat <<EOF
+
+${BOLD}${GREEN}  Done. Scaffold updated to v${SCAFFOLD_VERSION}.${RESET}
+
+  ${BOLD}Refreshed:${RESET} ${COUNT_REFRESHED} tool-authored files
+  ${BOLD}Kept safe:${RESET} ${COUNT_KEPT} personal files ${DIM}(your agent's name, memory, beads, lessons)${RESET}
+
+  ${DIM}Re-run \`npx youragent\` anytime — updates are always safe.${RESET}
+
+EOF
+else
+  cat <<EOF
 
 ${BOLD}${GREEN}  Done. Your repo has an agent.${RESET}
 
 ${BOLD}You're set. Two things to do:${RESET}
-  ${CYAN}1.${RESET} Open your agentic tool in this repo ${DIM}(Claude Code / Codex / Cursor / Windsurf auto-load the scaffold via the hook files above)${RESET}
+  ${CYAN}1.${RESET} Open your agentic tool in this repo ${DIM}(Claude Code / Codex / Cursor / Windsurf auto-load via the hook files)${RESET}
   ${CYAN}2.${RESET} Give it a real task. Watch it close beads with evidence.
 
-${DIM}Tools without a hook file (Aider, OpenClaw, others): paste "Read .agent/NORTH_STAR.md to orient" at session start.${RESET}
+${DIM}Aider / OpenClaw / others: paste "Read .agent/NORTH_STAR.md to orient" at session start.${RESET}
 
-${DIM}First time? Read .agent/HUMAN_GUIDE.md (2 min) and .agent/GETTING_STARTED.md (10 min).${RESET}
-${DIM}Curious what the agent knows? .agent/PATTERNS_CATALOG.md — 130 patterns it inherited.${RESET}
+${DIM}First time with agents? .agent/GETTING_STARTED.md (10 min).${RESET}
+${DIM}Curious what the agent knows? .agent/PATTERNS_CATALOG.md — 130 patterns inherited from the COE.${RESET}
 
-${BOLD}Autonomous mode${RESET} ${DIM}(once you trust the agent — usually after 2-3 tasks)${RESET}
+${BOLD}Autonomous mode${RESET} ${DIM}(once you trust it — usually after 2-3 tasks)${RESET}
   Claude Code:     ${BOLD}claude --dangerously-skip-permissions${RESET}
   Codex:           ${BOLD}codex --yolo${RESET}
   Aider:           ${BOLD}aider --yes${RESET}
   Cursor/Windsurf: agent mode with auto-approve in settings
-  ${YELLOW}Warning:${RESET} only under version control, only with a bead graph with acceptance criteria.
-  First few runs: watch the agent close beads with real evidence. Trust is earned.
 
 ${BOLD}Next level${RESET}
   ${BOLD}.agent/GOGCLI_STARTER.md${RESET} wires the agent into your Gmail / Docs / Calendar.
   This is where "neat" becomes "runs my inbox while I sleep."
 
-${DIM}Personality too sharp? Too soft? .agent/TWEAKING.md shows how to dial it.${RESET}
+${DIM}Personality too sharp? .agent/TWEAKING.md shows how to dial it.${RESET}
 ${DIM}Built by Trilogy AI COE — trilogyai.substack.com.${RESET}
 
 EOF
+fi

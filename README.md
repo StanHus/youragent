@@ -56,8 +56,23 @@ Full file tree lives in `.agent/HUMAN_GUIDE.md` after install. Read it (2 min).
 ## After install
 
 1. Open your tool in the repo.
-2. Tell it: *"Read `.agent/NORTH_STAR.md` to orient, then ask what I need."*
+2. Tell it: *"Read `.agent/NORTH_STAR.md` to orient, then ask what I need."* (Claude Code, Codex, Cursor, and Windsurf auto-pick it up via the hook files — you can skip this step.)
 3. Go.
+
+---
+
+## Updates are safe
+
+Run `npx youragent` again anytime. The scaffold files (`SOUL.md`, `AGENT.md`, the pattern catalog, etc.) get refreshed to the latest version. Your personal files (`IDENTITY.md`, `USER.md`, `MEMORY.md`, `BEADS.md`, `LESSONS_LEARNED.md`) are never touched.
+
+Output looks like this:
+
+```
+Refreshed: 14 tool-authored files
+Kept safe: 8 personal files (your agent's name, memory, beads, lessons)
+```
+
+If `.agent/` already exists but wasn't installed by us (another tool, or hand-rolled), we refuse to touch it and tell you exactly what to do. Your setup is always safe.
 
 ---
 
