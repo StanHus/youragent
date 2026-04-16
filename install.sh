@@ -301,12 +301,11 @@ EOF
   fi
 
   # Determine source mode
-  local src_dir="${BOOTSTRAP_LOCAL_SRC:-}"
   local script_path
 
-  if [ -n "$src_dir" ]; then
+  if [ -n "$SRC_DIR" ]; then
     # Local mode - use local openclaw-configure.sh
-    script_path="$src_dir/openclaw-configure.sh"
+    script_path="$SRC_DIR/openclaw-configure.sh"
     if [ ! -f "$script_path" ]; then
       say "${RED}✗${RESET} Local source specified but openclaw-configure.sh not found at $script_path"
       exit 1
@@ -325,8 +324,8 @@ EOF
   "$script_path"
   local exit_code=$?
 
-  # Clean up temp file if we created one
-  if [ -z "$src_dir" ]; then
+  # Clean up temp file if we fetched remotely
+  if [ -z "$SRC_DIR" ]; then
     rm -f "$script_path"
   fi
 
