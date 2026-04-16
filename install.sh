@@ -15,8 +15,11 @@
 
 set -euo pipefail
 
+# ---------- subcommand dispatch ----------
+SUBCOMMAND="${1:-install}"
+
 # ---------- config ----------
-SCAFFOLD_VERSION="1.2.0"
+SCAFFOLD_VERSION="1.3.0"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -63,6 +66,222 @@ bar() {
 
 say() { printf "  %s\n" "$1"; }
 hr() { printf "  ${DIM}────────────────────────────────────────────────────────${RESET}\n"; }
+
+# ---------- status subcommand ----------
+cmd_status() {
+  local agent_dir="$PWD/.agent"
+  local marker="$agent_dir/.youragent"
+
+  if [ ! -d "$agent_dir" ] || [ ! -f "$marker" ]; then
+    cat <<EOF
+
+  ${DIM}No agent installed in this directory.${RESET}
+
+  ${BOLD}Run:${RESET}   npx youragent
+  ${BOLD}Help:${RESET}  https://github.com/stanhus/youragent
+
+EOF
+    exit 0
+  fi
+
+  # Gather facts (python3 does the heavy lifting, same as bd-lite)
+  python3 - "$agent_dir" "$SCAFFOLD_VERSION" "$BOLD" "$DIM" "$RESET" "$GREEN" "$YELLOW" "$CYAN" "$MAGENTA" <<'PY'
+import sys, os, re
+from datetime import datetime, timezone
+
+agent_dir, current_version, BOLD, DIM, RESET, GREEN, YELLOW, CYAN, MAGENTA = sys.argv[1:10]
+
+def read_lines(path, n=10):
+    try:
+        with open(path) as f:
+            return [l.rstrip() for l in f.readlines()[:n]]
+    except FileNotFoundError:
+        return []
+
+def marker_info():
+    try:
+        with open(os.path.join(agent_dir, ".youragent")) as f:
+            kv = {}
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    kv[k] = v
+            return kv
+    except FileNotFoundError:
+        return {}
+
+def is_placeholder(line):
+    """Template scaffolding we shouldn't treat as user content."""
+    if not line: return True
+    if "_(" in line: return True                                       # italic placeholder: _(fill me in)_
+    if line.startswith(("#", ">", "-", "*", "_", "|")): return True   # any markdown prefix
+    stripped = re.sub(r'[*_`~]+', '', line).strip()                   # strip bold/italic markers
+    if not stripped: return True
+    if stripped.endswith(":") and len(stripped) < 40: return True     # label like "Example:" or "**In scope:**"
+    return False
+
+def extract_identity():
+    """Pull name + purpose from IDENTITY.md if the human filled them in."""
+    lines = read_lines(os.path.join(agent_dir, "IDENTITY.md"), 80)
+    name = None
+    purpose = None
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if name is None and s.startswith("## Name"):
+            for j in range(i+1, min(i+6, len(lines))):
+                v = lines[j].strip()
+                if v and not is_placeholder(v):
+                    name = v.lstrip("*_ ").rstrip("*_ ")
+                    break
+        if purpose is None and s.startswith("## Purpose"):
+            for j in range(i+1, min(i+10, len(lines))):
+                v = lines[j].strip()
+                if v and not is_placeholder(v):
+                    purpose = v.strip(" >").rstrip(".")
+                    if len(purpose) > 53:
+                        purpose = purpose[:50] + "..."
+                    break
+    return name, purpose
+
+def count_beads():
+    """Parse memory/BEADS.md, count by status."""
+    path = os.path.join(agent_dir, "memory", "BEADS.md")
+    counts = {"pending": 0, "in_progress": 0, "blocked": 0, "done": 0, "cancelled": 0}
+    try:
+        with open(path) as f:
+            for line in f:
+                m = re.match(r'^\| B\d{4} \| \S+ \| (\S+) \|', line)
+                if m:
+                    status = m.group(1)
+                    if status in counts:
+                        counts[status] += 1
+    except FileNotFoundError:
+        pass
+    return counts
+
+def count_memory_facts():
+    """Count lines in MEMORY.md that look like user-added facts.
+    Skip markdown scaffolding, numbered rules, placeholder italics, HR dividers."""
+    path = os.path.join(agent_dir, "MEMORY.md")
+    count = 0
+    try:
+        with open(path) as f:
+            for line in f:
+                s = line.strip()
+                if not s: continue
+                if s.startswith(("#", ">", "-", "*", "|", "~", "_")): continue
+                if re.match(r"^\d+\.", s): continue          # numbered list item
+                if re.match(r"^-{3,}$", s): continue          # horizontal rule
+                if "_(" in s: continue                        # template placeholder
+                count += 1
+    except FileNotFoundError:
+        pass
+    return count
+
+def count_lessons():
+    """Count '## YYYY' sections in LESSONS_LEARNED.md."""
+    lessons = 0
+    try:
+        with open(os.path.join(agent_dir, "LESSONS_LEARNED.md")) as f:
+            for line in f:
+                if re.match(r'^##\s+20\d{2}-', line):
+                    lessons += 1
+    except FileNotFoundError:
+        pass
+    return lessons
+
+def age_of(iso_ts):
+    try:
+        ts = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        delta = now - ts
+        s = int(delta.total_seconds())
+        if s < 60: return f"{s}s ago"
+        if s < 3600: return f"{s//60}m ago"
+        if s < 86400: return f"{s//3600}h ago"
+        return f"{s//86400}d ago"
+    except Exception:
+        return ""
+
+marker = marker_info()
+version = marker.get("version", "?")
+installed = marker.get("installed", "")
+installed_age = age_of(installed) if installed else ""
+
+name, purpose = extract_identity()
+name = name or "(unnamed — edit IDENTITY.md)"
+purpose = purpose or "(no purpose set — edit IDENTITY.md)"
+
+beads = count_beads()
+open_count = beads["pending"] + beads["in_progress"]
+blocked = beads["blocked"]
+done = beads["done"]
+
+facts = count_memory_facts()
+lessons = count_lessons()
+
+# version drift hint
+version_hint = ""
+if version != current_version:
+    version_hint = f" {YELLOW}(update available → v{current_version}){RESET}"
+
+# layout
+W = 57  # inner width
+def row(content=""):
+    # content may include ANSI codes; we can't measure visually, so we just pad with spaces up to a visual count.
+    # Strip ANSI for length calc.
+    visible = re.sub(r'\x1b\[[0-9;]*m', '', content)
+    pad = max(0, W - len(visible))
+    print(f"  {MAGENTA}│{RESET} {content}{' ' * pad} {MAGENTA}│{RESET}")
+
+def divider(label=""):
+    if label:
+        line = f"├─ {label} "
+        dashes = "─" * (W - len(line) + 2)
+        print(f"  {MAGENTA}{line}{dashes}┤{RESET}")
+    else:
+        print(f"  {MAGENTA}├{'─' * (W+2)}┤{RESET}")
+
+print()
+print(f"  {MAGENTA}╭─ your agent {'─' * (W - 11)}╮{RESET}")
+row()
+row(f"  {BOLD}{name}{RESET}")
+row(f"  {DIM}{purpose}{RESET}")
+row()
+divider("beads")
+row()
+row(f"  {GREEN}●{RESET}  {open_count} open       {DIM}ready to claim{RESET}")
+row(f"  {YELLOW}○{RESET}  {blocked} blocked    {DIM}waiting on something{RESET}")
+row(f"  {DIM}✓{RESET}  {done} done       {DIM}closed with evidence{RESET}")
+row()
+divider("signals")
+row()
+row(f"  Memory:     {facts} facts logged")
+row(f"  Lessons:    {lessons} captured")
+row(f"  Scaffold:   v{version}{version_hint}  {DIM}({installed_age}){RESET}")
+row()
+print(f"  {MAGENTA}╰{'─' * (W+2)}╯{RESET}")
+print()
+
+# Action line
+if open_count > 0:
+    print(f"  {BOLD}Next:{RESET}  ./.agent/memory/bd-lite.sh ready")
+elif blocked > 0:
+    print(f"  {BOLD}Next:{RESET}  Unblock a bead — see ./.agent/memory/BEADS.md")
+elif done == 0:
+    print(f"  {BOLD}Next:{RESET}  Open your agentic tool, give it a task")
+else:
+    print(f"  {BOLD}Next:{RESET}  All beads drained. Give your agent something new.")
+
+print(f"  {DIM}Help:  cat .agent/HUMAN_GUIDE.md{RESET}")
+print()
+PY
+  exit 0
+}
+
+if [ "$SUBCOMMAND" = "status" ]; then
+  cmd_status
+fi
 
 banner() {
   cat <<EOF

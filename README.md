@@ -61,6 +61,16 @@ Full file tree lives in `.agent/HUMAN_GUIDE.md` after install. Read it (2 min).
 
 ---
 
+## Check on your agent
+
+Run this in a repo that has `.agent/`:
+
+```bash
+npx youragent status
+```
+
+You get a single-screen view: agent name + purpose, bead counts (open / blocked / done), memory facts, lessons learned, scaffold version, and one actionable next step. Read-only — nothing changes.
+
 ## Updates are safe
 
 Run `npx youragent` again anytime. The scaffold files (`SOUL.md`, `AGENT.md`, the pattern catalog, etc.) get refreshed to the latest version. Your personal files (`IDENTITY.md`, `USER.md`, `MEMORY.md`, `BEADS.md`, `LESSONS_LEARNED.md`) are never touched.
