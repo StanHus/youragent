@@ -85,6 +85,16 @@ You'll see output like: `Refreshed: 14 tool-authored files. Kept safe: 8 persona
 
 If you want to nuke and restart (losing everything), set `BOOTSTRAP_FORCE=1`. Rare, reserved for real mistakes.
 
+## See what your agent is up to
+
+Any time, from your repo root:
+
+```bash
+npx youragent status
+```
+
+Prints a clean box: your agent's name, purpose, how many beads are open/blocked/done, memory facts logged, lessons captured, scaffold version, and one next step. Read-only.
+
 ## What to do if it goes sideways
 
 - **Agent sounds corporate** → edit `SOUL.md`, re-emphasize the 8 vibe rules.
