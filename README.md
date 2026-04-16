@@ -74,6 +74,12 @@ npx youragent validate
 
 `validate` checks the scaffold is wired correctly: required files present, marker/version sane, identity can be parsed, hook files still point at `.agent/`, and the bead ledger is readable. It exits non-zero on real breakage.
 
+## Roadmap
+
+The next step for `youragent` is not "more markdown". It is turning the scaffold into an actual repo-native operating layer: doctor/repair commands, workflow generators, profiles, composed context, and CI enforcement.
+
+See [ROADMAP.md](./ROADMAP.md).
+
 ## Updates are safe
 
 Run `npx youragent` again anytime. The scaffold files (`SOUL.md`, `AGENT.md`, the pattern catalog, etc.) get refreshed to the latest version. Your personal files (`IDENTITY.md`, `USER.md`, `MEMORY.md`, `BEADS.md`, `LESSONS_LEARNED.md`) are never touched.
