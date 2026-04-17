@@ -437,6 +437,83 @@ if [ "$SUBCOMMAND" = "status" ]; then
   cmd_status
 fi
 
+# ---------- configure-openclaw subcommand ----------
+find_openclaw_configure_script() {
+  local script_entry package_dir target
+  script_entry="${BASH_SOURCE[0]}"
+
+  while [ -L "$script_entry" ]; do
+    target="$(readlink "$script_entry")"
+    case "$target" in
+      /*) script_entry="$target" ;;
+      *) script_entry="$(cd "$(dirname "$script_entry")" 2>/dev/null && pwd)/$target" ;;
+    esac
+  done
+
+  package_dir="$(cd "$(dirname "$script_entry")" 2>/dev/null && pwd -P || echo "")"
+
+  if [ -n "$SRC_DIR" ]; then
+    local local_override="$SRC_DIR/openclaw-configure.sh"
+    if [ -f "$local_override" ]; then
+      printf '%s\n' "$local_override"
+      return 0
+    fi
+    say "${RED}✗${RESET} Local source specified but openclaw-configure.sh not found at $local_override"
+    return 1
+  fi
+
+  if [ -n "$package_dir" ] && [ -f "$package_dir/openclaw-configure.sh" ]; then
+    printf '%s\n' "$package_dir/openclaw-configure.sh"
+    return 0
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    say "${RED}✗${RESET} curl not found and no local openclaw-configure.sh available"
+    return 1
+  fi
+
+  local fetched="/tmp/.openclaw-configure-$$.sh"
+  curl -fsSL "$RAW_BASE/openclaw-configure.sh" -o "$fetched" || {
+    say "${RED}✗${RESET} Failed to fetch openclaw-configure.sh"
+    return 1
+  }
+  chmod +x "$fetched"
+  printf '%s\n' "$fetched"
+}
+
+cmd_configure_openclaw() {
+  if [ ! -f "$HOME/.openclaw/openclaw.json" ]; then
+    cat <<EOF
+
+  ${DIM}OpenClaw not detected (no ~/.openclaw/openclaw.json)${RESET}
+
+  ${BOLD}What is this?${RESET}
+    This command configures persistent OpenClaw agents to automatically
+    read .agent/ folders when they enter repositories with youragent.
+
+  ${BOLD}Install OpenClaw:${RESET}  https://github.com/openclaw/openclaw
+
+EOF
+    exit 1
+  fi
+
+  local script_path
+  script_path="$(find_openclaw_configure_script)" || exit 1
+
+  "$script_path"
+  local exit_code=$?
+
+  if [ "${script_path#/tmp/.openclaw-configure-}" != "$script_path" ]; then
+    rm -f "$script_path"
+  fi
+
+  exit $exit_code
+}
+
+if [ "$SUBCOMMAND" = "configure-openclaw" ]; then
+  cmd_configure_openclaw
+fi
+
 if [ "$SUBCOMMAND" = "validate" ]; then
   cmd_validate
 fi
@@ -716,6 +793,16 @@ fi
 
 hr
 
+# ---------- OpenClaw integration prompt ----------
+if [ -f "$HOME/.openclaw/openclaw.json" ] && [ "$INSTALL_MODE" = "fresh" ]; then
+  say "${BOLD}OpenClaw Detected${RESET}"
+  say ""
+  say "  ${DIM}Configure your OpenClaw agents to auto-read .agent/ folders:${RESET}"
+  say "  ${BOLD}npx youragent configure-openclaw${RESET}"
+  say ""
+  hr
+fi
+
 # ---------- final message ----------
 if [ "$INSTALL_MODE" = "update" ]; then
   cat <<EOF
@@ -737,7 +824,8 @@ ${BOLD}You're set. Two things to do:${RESET}
   ${CYAN}1.${RESET} Open your agentic tool in this repo ${DIM}(Claude Code / Codex / Cursor / Windsurf auto-load via the hook files)${RESET}
   ${CYAN}2.${RESET} Give it a real task. Watch it close beads with evidence.
 
-${DIM}Aider / OpenClaw / others: paste "Read .agent/NORTH_STAR.md to orient" at session start.${RESET}
+${DIM}Aider: paste "Read .agent/NORTH_STAR.md to orient" at session start.${RESET}
+${DIM}OpenClaw: run ${BOLD}npx youragent configure-openclaw${RESET}${DIM} to auto-configure all agents.${RESET}
 
 ${DIM}First time with agents? .agent/GETTING_STARTED.md (10 min).${RESET}
 ${DIM}Curious what the agent knows? .agent/PATTERNS_CATALOG.md — 130 patterns inherited from the COE.${RESET}
