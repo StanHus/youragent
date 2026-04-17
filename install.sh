@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.3.6"
+SCAFFOLD_VERSION="1.3.7"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -823,18 +823,98 @@ if [ ${#HOOK_WARN[@]} -gt 0 ]; then
   done
 fi
 
-# ---------- final compact footer ----------
-printf "\n"
+# ---------- dense info panels ----------
+# Reveal a row with a small delay (or instant if NO_ANIM).
+row_reveal() {
+  printf "%s\n" "$1"
+  [ "$NO_ANIM" = "1" ] || [ ! -t 1 ] || sleep 0.015
+}
+panel() {
+  local title="$1"
+  printf "\n  ${BOLD}${CYAN}━━━ %s ${RESET}${CYAN}" "$title"
+  local remaining=$((62 - ${#title}))
+  while [ $remaining -gt 0 ]; do printf "━"; remaining=$((remaining-1)); done
+  printf "${RESET}\n"
+}
+
+# --- panel: what's in .agent/ ---
+panel "WHAT'S IN .agent/"
+row_reveal "  ${BOLD}CORE${RESET}  ${DIM}tool-authored · refreshed safely on every run${RESET}"
+row_reveal "  ${DIM}  SOUL              personality · opinionated, brief, no corporate${RESET}"
+row_reveal "  ${DIM}  AGENT             operating manual · plan-first, evidence-on-close${RESET}"
+row_reveal "  ${DIM}  NORTH_STAR        session orientation for this repo${RESET}"
+row_reveal "  ${DIM}  HUMAN_GUIDE       read me first (for you, not the agent)${RESET}"
+row_reveal "  ${DIM}  TWEAKING          how to dial the personality${RESET}"
+row_reveal "  ${DIM}  KNOWLEDGE_PACK    article index${RESET}"
+row_reveal "  ${DIM}  PATTERNS_CATALOG  130 patterns inherited from 14 Trilogy AI COE articles${RESET}"
+row_reveal "  ${DIM}  GOGCLI_STARTER    Gmail / Docs / Calendar on-ramp${RESET}"
+row_reveal "  ${DIM}  GETTING_STARTED   first-time agentic onboarding (10 min)${RESET}"
+row_reveal "  ${DIM}  memory/README     bead rules${RESET}"
+row_reveal "  ${DIM}  memory/bd-lite.sh bead CLI (python3)${RESET}"
+row_reveal "  ${DIM}  skills/README + skills/search-substack.sh (source retrieval, cited)${RESET}"
+row_reveal ""
+row_reveal "  ${BOLD}PERSONAL${RESET}  ${DIM}yours · created once · never overwritten${RESET}"
+row_reveal "  ${DIM}  IDENTITY          your agent's name + purpose${RESET}"
+row_reveal "  ${DIM}  USER              about you${RESET}"
+row_reveal "  ${DIM}  TOOLS             expected + recommended tools${RESET}"
+row_reveal "  ${DIM}  MEMORY            long-term facts${RESET}"
+row_reveal "  ${DIM}  LESSONS_LEARNED   mistake log${RESET}"
+row_reveal "  ${DIM}  memory/BEADS      task ledger (the agent closes these with evidence)${RESET}"
+row_reveal "  ${DIM}  memory/PROMPTS · memory/HANDOFF · memory/SHORT_TERM_MEMORY${RESET}"
+
+# --- panel: auto-wired hooks ---
+panel "AUTO-WIRED HOOKS"
+row_reveal "  ${GREEN}✓${RESET}  ${BOLD}CLAUDE.md${RESET}       ${DIM}Claude Code reads this automatically on session start${RESET}"
+row_reveal "  ${GREEN}✓${RESET}  ${BOLD}AGENTS.md${RESET}       ${DIM}Codex reads this automatically on session start${RESET}"
+row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.cursorrules${RESET}    ${DIM}Cursor reads this automatically on session start${RESET}"
+row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.windsurfrules${RESET}  ${DIM}Windsurf reads this automatically on session start${RESET}"
+
+# --- panel: runtime ---
+panel "RUNTIME"
+_rt_status() { if command -v "$1" >/dev/null 2>&1; then printf "${GREEN}✓${RESET}"; else printf "${RED}!${RESET}"; fi; }
+_rt_line() {
+  local cmd="$1" desc="$2"
+  local status; status=$(_rt_status "$cmd")
+  row_reveal "$(printf "  %s  ${BOLD}%-8s${RESET}${DIM}%s${RESET}" "$status" "$cmd" "$desc")"
+}
+_rt_line "python3" "bd-lite (task ledger) runs on this"
+_rt_line "npx"     "wwvcd retrieval skill uses this"
+_rt_line "git"     "version control + rollback safety"
+
+# Surface unlinked-hook warnings here (full detail, below the wiring panel).
+if [ ${#HOOK_WARN[@]} -gt 0 ]; then
+  printf "\n"
+  for w in "${HOOK_WARN[@]}"; do
+    printf "  ${YELLOW}!${RESET} ${DIM}%s${RESET}\n" "$w"
+  done
+fi
+
+# --- panel: agentized · what to do next ---
+panel "AGENTIZED · WHAT TO DO NEXT"
 if [ "$INSTALL_MODE" = "update" ]; then
-  printf "  ${GREEN}${BOLD}agentized${RESET}  ${DIM}→  updated to v%s · re-run anytime${RESET}\n" "$SCAFFOLD_VERSION"
+  row_reveal "  ${GREEN}${BOLD}updated to v${SCAFFOLD_VERSION}${RESET}  ${DIM}· re-run ${BOLD}npx agentize${RESET}${DIM} anytime, safe${RESET}"
 else
-  printf "  ${GREEN}${BOLD}agentized${RESET}  ${DIM}→  your repo now has a .agent/ folder your AI reads on entry${RESET}\n"
+  row_reveal "  ${CYAN}1${RESET}  ${BOLD}open${RESET} claude code / codex / cursor / windsurf in this repo  ${DIM}(auto-reads .agent/)${RESET}"
+  row_reveal "  ${CYAN}2${RESET}  ${BOLD}give it a real task${RESET}  ${DIM}— it'll plan, track beads, close with evidence${RESET}"
+  row_reveal "  ${DIM}     aider: paste 'Read .agent/NORTH_STAR.md to orient' at session start${RESET}"
+  if [ -f "$HOME/.openclaw/openclaw.json" ]; then
+    row_reveal "  ${DIM}     openclaw: run ${BOLD}npx agentize configure-openclaw${RESET}${DIM} to wire all your agents${RESET}"
+  fi
 fi
-printf "  ${DIM}what to do next${RESET}\n"
-printf "  ${DIM}  1. open claude code / codex / cursor / windsurf in this repo (it auto-reads .agent/)${RESET}\n"
-printf "  ${DIM}  2. give it a real task — it'll plan, track beads, and close with evidence${RESET}\n"
-printf "  ${DIM}first time? read .agent/GETTING_STARTED.md (10 min) or .agent/NORTH_STAR.md (orientation)${RESET}\n"
-if [ -f "$HOME/.openclaw/openclaw.json" ] && [ "$INSTALL_MODE" = "fresh" ]; then
-  printf "  ${DIM}openclaw detected → ${BOLD}npx agentize configure-openclaw${RESET}${DIM} to wire all your agents${RESET}\n"
-fi
-printf "\n"
+
+row_reveal ""
+row_reveal "  ${BOLD}AUTONOMOUS MODE${RESET}  ${DIM}(after 2-3 tasks you trust it)${RESET}"
+row_reveal "  ${DIM}  claude     ${RESET}${BOLD}claude --dangerously-skip-permissions${RESET}"
+row_reveal "  ${DIM}  codex      ${RESET}${BOLD}codex --yolo${RESET}"
+row_reveal "  ${DIM}  aider      ${RESET}${BOLD}aider --yes${RESET}"
+row_reveal "  ${DIM}  cursor / windsurf    agent mode + auto-approve in settings${RESET}"
+
+row_reveal ""
+row_reveal "  ${BOLD}WHERE TO READ${RESET}"
+row_reveal "  ${DIM}  .agent/NORTH_STAR.md        orient for this repo${RESET}"
+row_reveal "  ${DIM}  .agent/GETTING_STARTED.md   first-time agentic onboarding (10 min)${RESET}"
+row_reveal "  ${DIM}  .agent/PATTERNS_CATALOG.md  130 patterns your agent inherited${RESET}"
+row_reveal "  ${DIM}  .agent/TWEAKING.md          personality too sharp? dial it here${RESET}"
+row_reveal "  ${DIM}  .agent/GOGCLI_STARTER.md    wire the agent into Gmail / Docs / Calendar${RESET}"
+
+printf "\n  ${DIM}Built by Trilogy AI Center of Excellence · trilogyai.substack.com${RESET}\n\n"
