@@ -72,6 +72,37 @@ EOF
 NO_ANIM=1 bash /path/to/youragent/install.sh status | grep 'Scribe'
 ```
 
+## PR checklist
+
+Before merging a PR, review it from the consumer's point of view, not just the repo author's.
+
+- Does `npm test` pass?
+- Does `npm pack` succeed?
+- Does the tarball include every new runtime file the feature needs?
+- If a new script or asset is required at runtime, is it present in `package.json` `files`?
+- If a new subcommand is added, did you test it through the packaged entrypoint, not only from a local checkout?
+- If the change affects `npx youragent`, does it still work in non-interactive and non-TTY contexts?
+- If the change modifies files outside the repo or user home config, is it explicitly opt-in and clearly explained?
+- If the change claims to be idempotent, did you test a second run?
+- If the change updates user-facing behavior, is `README.md` accurate and specific about commands, side effects, and rollback?
+- If the package manifest is changed during publish by npm normalization, did you commit the normalized form back to the repo?
+
+For features that touch installation or external config, also verify these concrete flows:
+
+```bash
+# Clean package smoke test
+npm test
+npm pack
+
+# Inspect what will really ship
+tar -tzf youragent-*.tgz
+
+# Package-level execution check
+npx youragent status || true
+```
+
+If a PR fails this checklist, don't merge it on vibes. Fix the consumer path first.
+
 ## Adding a template
 
 1. Add `.md` to `templates/`.
