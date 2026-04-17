@@ -1,12 +1,14 @@
-# youragent
+# agentize
 
 > **Your first agent, done right.** One line. Any repo. Works with whatever agentic tool you already have — Claude Code, Codex, Cursor, OpenClaw, Aider, Windsurf.
 >
 > This isn't "set up a folder." This ships the **[Trilogy AI Center of Excellence](https://trilogyai.substack.com/) methodology** on top of a bead-graph task system inspired by **[Steve Yegge's Beads](https://github.com/steveyegge/beads)** — spiky takes, evidence-on-close, and a 130-pattern knowledge base your agent inherits on install.
 
-[![npm](https://img.shields.io/npm/v/youragent.svg)](https://www.npmjs.com/package/youragent)
-[![downloads](https://img.shields.io/npm/dm/youragent.svg)](https://npm-stat.com/charts.html?package=youragent)
-[![license](https://img.shields.io/npm/l/youragent.svg)](./LICENSE)
+> Published on npm as both [`agentize`](https://www.npmjs.com/package/agentize) (canonical) and [`youragent`](https://www.npmjs.com/package/youragent) (legacy alias). Same package, either name works. New users: prefer `agentize`.
+
+[![npm](https://img.shields.io/npm/v/agentize.svg)](https://www.npmjs.com/package/agentize)
+[![downloads](https://img.shields.io/npm/dm/agentize.svg)](https://npm-stat.com/charts.html?package=agentize)
+[![license](https://img.shields.io/npm/l/agentize.svg)](./LICENSE)
 
 ---
 
@@ -14,6 +16,9 @@
 
 ```bash
 # Recommended:
+npx agentize
+
+# Legacy alias (same package):
 npx youragent
 
 # Fallback (no Node required):
@@ -40,7 +45,7 @@ Each is a short redirect pointing the agent at `.agent/NORTH_STAR.md`. If you al
 If you use **[OpenClaw](https://github.com/openclaw/openclaw)** with persistent agents, configure them to automatically read `.agent/` folders:
 
 ```bash
-npx youragent configure-openclaw
+npx agentize configure-openclaw
 ```
 
 This command:

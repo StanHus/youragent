@@ -6,7 +6,7 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/stanhus/youragent/main/install.sh | bash
-#   npx youragent
+#   npx agentize   (or: npx youragent — legacy alias, same package)
 #   BOOTSTRAP_LOCAL_SRC=/path/to/repo bash install.sh   # local testing
 #
 # Re-running on a repo that already has our scaffold → safe update (your
@@ -78,7 +78,7 @@ run_agent_audit() {
 
   ${DIM}No agent installed in this directory.${RESET}
 
-  ${BOLD}Run:${RESET}   npx youragent
+  ${BOLD}Run:${RESET}   npx agentize
   ${BOLD}Help:${RESET}  https://github.com/stanhus/youragent
 
 EOF
@@ -399,7 +399,7 @@ elif mode == "validate":
     passes, warnings, failures = validate()
 
     print()
-    print(f"  {BOLD}youragent validate{RESET}")
+    print(f"  {BOLD}agentize validate{RESET}")
     print(f"  {DIM}{agent_dir}{RESET}")
     print()
     for msg in passes:
@@ -798,7 +798,7 @@ if [ -f "$HOME/.openclaw/openclaw.json" ] && [ "$INSTALL_MODE" = "fresh" ]; then
   say "${BOLD}OpenClaw Detected${RESET}"
   say ""
   say "  ${DIM}Configure your OpenClaw agents to auto-read .agent/ folders:${RESET}"
-  say "  ${BOLD}npx youragent configure-openclaw${RESET}"
+  say "  ${BOLD}npx agentize configure-openclaw${RESET}"
   say ""
   hr
 fi
@@ -812,7 +812,7 @@ ${BOLD}${GREEN}  Done. Scaffold updated to v${SCAFFOLD_VERSION}.${RESET}
   ${BOLD}Refreshed:${RESET} ${COUNT_REFRESHED} tool-authored files
   ${BOLD}Kept safe:${RESET} ${COUNT_KEPT} personal files ${DIM}(your agent's name, memory, beads, lessons)${RESET}
 
-  ${DIM}Re-run \`npx youragent\` anytime — updates are always safe.${RESET}
+  ${DIM}Re-run \`npx agentize\` anytime — updates are always safe.${RESET}
 
 EOF
 else
@@ -825,7 +825,7 @@ ${BOLD}You're set. Two things to do:${RESET}
   ${CYAN}2.${RESET} Give it a real task. Watch it close beads with evidence.
 
 ${DIM}Aider: paste "Read .agent/NORTH_STAR.md to orient" at session start.${RESET}
-${DIM}OpenClaw: run ${BOLD}npx youragent configure-openclaw${RESET}${DIM} to auto-configure all agents.${RESET}
+${DIM}OpenClaw: run ${BOLD}npx agentize configure-openclaw${RESET}${DIM} to auto-configure all agents.${RESET}
 
 ${DIM}First time with agents? .agent/GETTING_STARTED.md (10 min).${RESET}
 ${DIM}Curious what the agent knows? .agent/PATTERNS_CATALOG.md — 130 patterns inherited from the COE.${RESET}

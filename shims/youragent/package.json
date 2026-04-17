@@ -1,0 +1,39 @@
+{
+  "name": "youragent",
+  "version": "2.0.0",
+  "description": "Legacy alias for `agentize`. Same package — forwards to agentize. Prefer `npx agentize` going forward.",
+  "bin": {
+    "youragent": "bin.js"
+  },
+  "dependencies": {
+    "agentize": "^1.3.3"
+  },
+  "files": [
+    "bin.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "agent",
+    "agentize",
+    "youragent",
+    "trilogy-ai-coe"
+  ],
+  "homepage": "https://github.com/stanhus/youragent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stanhus/youragent.git",
+    "directory": "shims/youragent"
+  },
+  "bugs": {
+    "url": "https://github.com/stanhus/youragent/issues"
+  },
+  "author": {
+    "name": "Stan Huseletov",
+    "url": "https://huseletov.substack.com/"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  }
+}
