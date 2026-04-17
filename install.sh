@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.3.0"
+SCAFFOLD_VERSION="1.3.6"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -722,10 +722,14 @@ COUNT_KEPT=0
 COUNT_INSTALLED=0
 
 # ---------- dashboard + silent install ----------
+# One-line pitch a non-techie can grok before the table lights up.
+printf "\n  ${BOLD}dropping a .agent/ scaffold into this repo${RESET}\n"
+printf "  ${DIM}your AI gets: a personality, a memory, a task ledger, and 130 patterns inherited from the Trilogy AI COE${RESET}\n"
+
 dash_init
-dash_add "scaffold" "14 templates, personality + operating"
-dash_add "memory"   "beads, lessons, handoff"
-dash_add "skills"   "substack retrieval w/ attribution"
+dash_add "scaffold" "personality + operating rules + identity"
+dash_add "memory"   "long-term, short-term, handoff, ledger"
+dash_add "skills"   "substack retrieval (cited)"
 dash_add "hooks"    "claude, codex, cursor, windsurf"
 dash_add "runtime"  "python3, npx, git"
 
@@ -743,7 +747,7 @@ for t in "${USER_TEMPLATES[@]}"; do
   fi
 done
 sleep 0.08
-dash_update "scaffold" ready "$((COUNT_REFRESHED + COUNT_INSTALLED)) written, ${COUNT_KEPT} kept"
+dash_update "scaffold" ready "personality + operating rules + identity"
 
 # memory: scaffold files + user memory
 for f in "${SCAFFOLD_MEMORY[@]}"; do
@@ -759,7 +763,7 @@ for f in "${USER_MEMORY[@]}"; do
   fi
 done
 sleep 0.08
-dash_update "memory" ready "beads, lessons, handoff"
+dash_update "memory" ready "long-term, short-term, handoff, ledger"
 
 # skills
 for f in "${SKILLS_FILES[@]}"; do
@@ -768,7 +772,7 @@ for f in "${SKILLS_FILES[@]}"; do
 done
 chmod +x "$TARGET_DIR/skills/search-substack.sh"
 sleep 0.08
-dash_update "skills" ready "substack search + attribution"
+dash_update "skills" ready "substack retrieval (cited)"
 
 # Write marker
 printf "youragent-scaffold\nversion=%s\ninstalled=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MARKER_FILE"
@@ -824,11 +828,13 @@ printf "\n"
 if [ "$INSTALL_MODE" = "update" ]; then
   printf "  ${GREEN}${BOLD}agentized${RESET}  ${DIM}→  updated to v%s · re-run anytime${RESET}\n" "$SCAFFOLD_VERSION"
 else
-  printf "  ${GREEN}${BOLD}agentized${RESET}  ${DIM}→  open your agentic tool · give it a real task${RESET}\n"
+  printf "  ${GREEN}${BOLD}agentized${RESET}  ${DIM}→  your repo now has a .agent/ folder your AI reads on entry${RESET}\n"
 fi
-# One-line pointers (OpenClaw conditional, rest always useful)
-printf "  ${DIM}next · .agent/NORTH_STAR.md (orient) · .agent/GETTING_STARTED.md (10 min)${RESET}\n"
+printf "  ${DIM}what to do next${RESET}\n"
+printf "  ${DIM}  1. open claude code / codex / cursor / windsurf in this repo (it auto-reads .agent/)${RESET}\n"
+printf "  ${DIM}  2. give it a real task — it'll plan, track beads, and close with evidence${RESET}\n"
+printf "  ${DIM}first time? read .agent/GETTING_STARTED.md (10 min) or .agent/NORTH_STAR.md (orientation)${RESET}\n"
 if [ -f "$HOME/.openclaw/openclaw.json" ] && [ "$INSTALL_MODE" = "fresh" ]; then
-  printf "  ${DIM}openclaw detected · ${BOLD}npx agentize configure-openclaw${RESET}${DIM} to wire your agents${RESET}\n"
+  printf "  ${DIM}openclaw detected → ${BOLD}npx agentize configure-openclaw${RESET}${DIM} to wire all your agents${RESET}\n"
 fi
 printf "\n"
