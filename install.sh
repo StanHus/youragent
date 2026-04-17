@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.3.7"
+SCAFFOLD_VERSION="1.3.8"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -796,11 +796,27 @@ hook_install "CLAUDE.md"    "Claude Code"
 hook_install "AGENTS.md"    "Codex"
 hook_install ".cursorrules" "Cursor"
 hook_install ".windsurfrules" "Windsurf"
+
+# .agents/skills/ — cross-harness skills compat path (Codex, OpenCode, OpenHands,
+# Copilot, Gemini CLI, Amp, Cursor-compat, Kilo-compat, pi). Non-breaking:
+# only creates if nothing exists at that path, and prefers a symlink to
+# .agent/skills/ so there's one source of truth.
+AGENTS_COMPAT_STATE="skipped"
+if [ ! -e "$REPO_ROOT/.agents/skills" ]; then
+  mkdir -p "$REPO_ROOT/.agents"
+  if (cd "$REPO_ROOT/.agents" && ln -s "../.agent/skills" skills) 2>/dev/null; then
+    AGENTS_COMPAT_STATE="linked"
+  else
+    mkdir -p "$REPO_ROOT/.agents/skills"
+    cp -R "$TARGET_DIR/skills/." "$REPO_ROOT/.agents/skills/" 2>/dev/null && AGENTS_COMPAT_STATE="copied"
+  fi
+fi
+
 sleep 0.08
 if [ ${#HOOK_WARN[@]} -gt 0 ]; then
   dash_update "hooks" warn "${#HOOK_WARN[@]} hook(s) need a manual line"
 else
-  dash_update "hooks" ready "claude, codex, cursor, windsurf"
+  dash_update "hooks" ready "claude, codex, cursor, windsurf, .agents/skills"
 fi
 
 # runtime
@@ -868,6 +884,11 @@ row_reveal "  ${GREEN}✓${RESET}  ${BOLD}CLAUDE.md${RESET}       ${DIM}Claude C
 row_reveal "  ${GREEN}✓${RESET}  ${BOLD}AGENTS.md${RESET}       ${DIM}Codex reads this automatically on session start${RESET}"
 row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.cursorrules${RESET}    ${DIM}Cursor reads this automatically on session start${RESET}"
 row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.windsurfrules${RESET}  ${DIM}Windsurf reads this automatically on session start${RESET}"
+case "$AGENTS_COMPAT_STATE" in
+  linked) row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.agents/skills/${RESET} ${DIM}→ .agent/skills (cross-harness path: codex, opencode, copilot, gemini cli, …)${RESET}" ;;
+  copied) row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.agents/skills/${RESET} ${DIM}(copy of .agent/skills; symlink unavailable on this filesystem)${RESET}" ;;
+  skipped) row_reveal "  ${DIM}·  .agents/skills/  already exists — left alone${RESET}" ;;
+esac
 
 # --- panel: runtime ---
 panel "RUNTIME"
