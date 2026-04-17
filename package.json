@@ -1,20 +1,22 @@
 {
   "name": "youragent",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Your first agent, done right. One-line bootstrap that drops a .agent/ scaffold — personality, memory, bead-graph task ledger, and a 130-pattern knowledge catalog — into any repo. Built by the Trilogy AI Center of Excellence. Tool-agnostic: Claude Code, Codex, Cursor, OpenClaw, Aider, Windsurf.",
   "bin": {
-    "youragent": "./install.sh"
+    "youragent": "install.sh"
   },
   "scripts": {
-    "test": "NO_ANIM=1 BOOTSTRAP_TARGET=/tmp/.youragent-test-$$/.agent bash install.sh && rm -rf /tmp/.youragent-test-$$"
+    "test": "tmp=/tmp/.youragent-test-$$ && rm -rf \"$tmp\" && mkdir -p \"$tmp\" && NO_ANIM=1 BOOTSTRAP_TARGET=\"$tmp/.agent\" bash install.sh >/dev/null && printf '# IDENTITY.md\\n\\n## Name\\n\\n**Scribe** — maintainer agent for the youragent package itself\\n\\n## Purpose\\n\\nThis agent exists to keep the youragent scaffold correct, useful, and shippable.\\n' > \"$tmp/.agent/IDENTITY.md\" && (cd \"$tmp\" && NO_ANIM=1 bash /Users/stanhus/youragent/install.sh status | grep -q 'Scribe') && (cd \"$tmp\" && NO_ANIM=1 bash /Users/stanhus/youragent/install.sh validate >/dev/null) && version=$(node -p \"require('./package.json').version\") && npm pack >/dev/null && mkdir -p \"$tmp/home/.openclaw\" \"$tmp/atlas\" && printf '{\"agents\":{\"list\":[{\"workspace\":\"%s\",\"identity\":{\"name\":\"Atlas\"}}]}}\\n' \"$tmp/atlas\" > \"$tmp/home/.openclaw/openclaw.json\" && printf '# AGENTS\\n' > \"$tmp/atlas/AGENTS.md\" && HOME=\"$tmp/home\" npm exec --yes --package \"$PWD/youragent-$version.tgz\" youragent -- configure-openclaw >/dev/null && grep -Fq 'youragent-openclaw-v1' \"$tmp/atlas/AGENTS.md\" && HOME=\"$tmp/home\" npm exec --yes --package \"$PWD/youragent-$version.tgz\" youragent -- configure-openclaw >/dev/null && [ \"$(grep -Fc 'youragent-openclaw-v1' \"$tmp/atlas/AGENTS.md\")\" -eq 1 ] && rm -f \"$PWD/youragent-$version.tgz\" && rm -rf \"$tmp\""
   },
   "files": [
     "install.sh",
+    "openclaw-configure.sh",
     "templates/",
     "memory-scaffold/",
     "skills-scaffold/",
     "hooks-scaffold/",
     "README.md",
+    "ROADMAP.md",
     "CREDITS.md",
     "LICENSE"
   ],

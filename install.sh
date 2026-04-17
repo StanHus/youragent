@@ -67,8 +67,9 @@ bar() {
 say() { printf "  %s\n" "$1"; }
 hr() { printf "  ${DIM}────────────────────────────────────────────────────────${RESET}\n"; }
 
-# ---------- status subcommand ----------
-cmd_status() {
+# ---------- status + validate subcommands ----------
+run_agent_audit() {
+  local mode="$1" missing_exit="${2:-0}"
   local agent_dir="$PWD/.agent"
   local marker="$agent_dir/.youragent"
 
@@ -81,15 +82,15 @@ cmd_status() {
   ${BOLD}Help:${RESET}  https://github.com/stanhus/youragent
 
 EOF
-    exit 0
+    exit "$missing_exit"
   fi
 
-  # Gather facts (python3 does the heavy lifting, same as bd-lite)
-  python3 - "$agent_dir" "$SCAFFOLD_VERSION" "$BOLD" "$DIM" "$RESET" "$GREEN" "$YELLOW" "$CYAN" "$MAGENTA" <<'PY'
+  python3 - "$mode" "$agent_dir" "$SCAFFOLD_VERSION" "$BOLD" "$DIM" "$RESET" "$GREEN" "$YELLOW" "$CYAN" "$MAGENTA" <<'PY'
 import sys, os, re
 from datetime import datetime, timezone
 
-agent_dir, current_version, BOLD, DIM, RESET, GREEN, YELLOW, CYAN, MAGENTA = sys.argv[1:10]
+mode, agent_dir, current_version, BOLD, DIM, RESET, GREEN, YELLOW, CYAN, MAGENTA = sys.argv[1:11]
+repo_root = os.path.dirname(agent_dir)
 
 def read_lines(path, n=10):
     try:
@@ -112,13 +113,23 @@ def marker_info():
 
 def is_placeholder(line):
     """Template scaffolding we shouldn't treat as user content."""
-    if not line: return True
-    if "_(" in line: return True                                       # italic placeholder: _(fill me in)_
-    if line.startswith(("#", ">", "-", "*", "_", "|")): return True   # any markdown prefix
-    stripped = re.sub(r'[*_`~]+', '', line).strip()                   # strip bold/italic markers
+    raw = line.strip()
+    if not raw: return True
+    if "_(" in raw: return True                                       # italic placeholder: _(fill me in)_
+    stripped = re.sub(r'[*_`~]+', '', raw).strip()                    # strip bold/italic markers
     if not stripped: return True
+    if raw.startswith(("#", ">", "|")): return True                   # headings, quotes, tables
+    if re.match(r'^[-*]\s+', raw): return True                        # bullet markers only
     if stripped.endswith(":") and len(stripped) < 40: return True     # label like "Example:" or "**In scope:**"
     return False
+
+def clean_inline_markdown(text):
+    return re.sub(r'[*_`~]+', '', text).strip()
+
+def extract_name_value(text):
+    cleaned = clean_inline_markdown(text).lstrip("> ").strip()
+    primary = re.split(r'\s+[—-]\s+|\s+\|\s+', cleaned, maxsplit=1)[0].strip()
+    return primary or cleaned
 
 def extract_identity():
     """Pull name + purpose from IDENTITY.md if the human filled them in."""
@@ -131,17 +142,24 @@ def extract_identity():
             for j in range(i+1, min(i+6, len(lines))):
                 v = lines[j].strip()
                 if v and not is_placeholder(v):
-                    name = v.lstrip("*_ ").rstrip("*_ ")
+                    name = extract_name_value(v)
                     break
         if purpose is None and s.startswith("## Purpose"):
             for j in range(i+1, min(i+10, len(lines))):
                 v = lines[j].strip()
                 if v and not is_placeholder(v):
-                    purpose = v.strip(" >").rstrip(".")
+                    purpose = clean_inline_markdown(v).strip(" >").rstrip(".")
                     if len(purpose) > 53:
                         purpose = purpose[:50] + "..."
                     break
     return name, purpose
+
+def has_placeholder_identity():
+    lines = read_lines(os.path.join(agent_dir, "IDENTITY.md"), 80)
+    for line in lines:
+        if "_(" in line:
+            return True
+    return False
 
 def count_beads():
     """Parse memory/BEADS.md, count by status."""
@@ -190,6 +208,112 @@ def count_lessons():
         pass
     return lessons
 
+def required_paths():
+    return [
+        "SOUL.md",
+        "AGENT.md",
+        "NORTH_STAR.md",
+        "IDENTITY.md",
+        "USER.md",
+        "MEMORY.md",
+        "LESSONS_LEARNED.md",
+        os.path.join("memory", "BEADS.md"),
+        os.path.join("memory", "PROMPTS.md"),
+        os.path.join("memory", "HANDOFF.md"),
+        os.path.join("memory", "SHORT_TERM_MEMORY.md"),
+        os.path.join("memory", "bd-lite.sh"),
+        os.path.join("skills", "search-substack.sh"),
+    ]
+
+def hook_targets():
+    return [
+        "CLAUDE.md",
+        "AGENTS.md",
+        ".cursorrules",
+        ".windsurfrules",
+    ]
+
+def file_contains_scaffold_ref(path):
+    try:
+        with open(path) as f:
+            content = f.read()
+        return any(token in content for token in ("youragent", "NORTH_STAR.md", ".agent/"))
+    except FileNotFoundError:
+        return False
+
+def validate():
+    failures = []
+    warnings = []
+    passes = []
+
+    marker = marker_info()
+    version = marker.get("version", "?")
+    installed = marker.get("installed", "")
+
+    if version == current_version:
+        passes.append(f"Scaffold marker version matches v{current_version}")
+    else:
+        warnings.append(f"Scaffold marker version is v{version}; installer ships v{current_version}")
+
+    if installed:
+        passes.append(f"Marker install timestamp present ({installed})")
+    else:
+        failures.append("Scaffold marker is missing install timestamp")
+
+    missing = [rel for rel in required_paths() if not os.path.exists(os.path.join(agent_dir, rel))]
+    if missing:
+        failures.append("Missing required scaffold files: " + ", ".join(missing))
+    else:
+        passes.append(f"Required scaffold files present ({len(required_paths())} checked)")
+
+    name, purpose = extract_identity()
+    if name:
+        passes.append(f"Identity name resolves to '{name}'")
+    elif has_placeholder_identity():
+        warnings.append("IDENTITY.md still contains placeholder text; status will show unnamed until filled")
+    else:
+        failures.append("IDENTITY.md exists but status could not extract a name")
+
+    if purpose:
+        passes.append("Identity purpose resolves for status output")
+    else:
+        warnings.append("IDENTITY.md purpose is still unset or unreadable")
+
+    hook_states = []
+    for hook in hook_targets():
+        hook_path = os.path.join(repo_root, hook)
+        if not os.path.exists(hook_path):
+            warnings.append(f"Hook file missing at repo root: {hook}")
+            continue
+        if file_contains_scaffold_ref(hook_path):
+            hook_states.append(hook)
+        else:
+            warnings.append(f"Hook file exists but does not reference .agent/: {hook}")
+    if hook_states:
+        passes.append(f"Hook files referencing scaffold: {', '.join(hook_states)}")
+
+    bead_path = os.path.join(agent_dir, "memory", "BEADS.md")
+    bead_count = 0
+    try:
+        with open(bead_path) as f:
+            for line in f:
+                if re.match(r'^\| B\d{4} \|', line):
+                    bead_count += 1
+    except FileNotFoundError:
+        pass
+    if bead_count:
+        passes.append(f"Bead ledger parseable ({bead_count} beads)")
+    else:
+        failures.append("Bead ledger contains no parseable beads")
+
+    memory_facts = count_memory_facts()
+    if memory_facts == 0:
+        warnings.append("MEMORY.md has no durable facts yet")
+    else:
+        passes.append(f"MEMORY.md has {memory_facts} durable fact lines")
+
+    return passes, warnings, failures
+
 def age_of(iso_ts):
     try:
         ts = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
@@ -208,75 +332,105 @@ version = marker.get("version", "?")
 installed = marker.get("installed", "")
 installed_age = age_of(installed) if installed else ""
 
-name, purpose = extract_identity()
-name = name or "(unnamed — edit IDENTITY.md)"
-purpose = purpose or "(no purpose set — edit IDENTITY.md)"
+if mode == "status":
+    name, purpose = extract_identity()
+    name = name or "(unnamed — edit IDENTITY.md)"
+    purpose = purpose or "(no purpose set — edit IDENTITY.md)"
 
-beads = count_beads()
-open_count = beads["pending"] + beads["in_progress"]
-blocked = beads["blocked"]
-done = beads["done"]
+    beads = count_beads()
+    open_count = beads["pending"] + beads["in_progress"]
+    blocked = beads["blocked"]
+    done = beads["done"]
 
-facts = count_memory_facts()
-lessons = count_lessons()
+    facts = count_memory_facts()
+    lessons = count_lessons()
 
-# version drift hint
-version_hint = ""
-if version != current_version:
-    version_hint = f" {YELLOW}(update available → v{current_version}){RESET}"
+    version_hint = ""
+    if version != current_version:
+        version_hint = f" {YELLOW}(update available → v{current_version}){RESET}"
 
-# layout
-W = 57  # inner width
-def row(content=""):
-    # content may include ANSI codes; we can't measure visually, so we just pad with spaces up to a visual count.
-    # Strip ANSI for length calc.
-    visible = re.sub(r'\x1b\[[0-9;]*m', '', content)
-    pad = max(0, W - len(visible))
-    print(f"  {MAGENTA}│{RESET} {content}{' ' * pad} {MAGENTA}│{RESET}")
+    W = 57
+    def row(content=""):
+        visible = re.sub(r'\x1b\[[0-9;]*m', '', content)
+        pad = max(0, W - len(visible))
+        print(f"  {MAGENTA}│{RESET} {content}{' ' * pad} {MAGENTA}│{RESET}")
 
-def divider(label=""):
-    if label:
-        line = f"├─ {label} "
-        dashes = "─" * (W - len(line) + 2)
-        print(f"  {MAGENTA}{line}{dashes}┤{RESET}")
+    def divider(label=""):
+        if label:
+            line = f"├─ {label} "
+            dashes = "─" * (W - len(line) + 2)
+            print(f"  {MAGENTA}{line}{dashes}┤{RESET}")
+        else:
+            print(f"  {MAGENTA}├{'─' * (W+2)}┤{RESET}")
+
+    print()
+    print(f"  {MAGENTA}╭─ your agent {'─' * (W - 11)}╮{RESET}")
+    row()
+    row(f"  {BOLD}{name}{RESET}")
+    row(f"  {DIM}{purpose}{RESET}")
+    row()
+    divider("beads")
+    row()
+    row(f"  {GREEN}●{RESET}  {open_count} open       {DIM}ready to claim{RESET}")
+    row(f"  {YELLOW}○{RESET}  {blocked} blocked    {DIM}waiting on something{RESET}")
+    row(f"  {DIM}✓{RESET}  {done} done       {DIM}closed with evidence{RESET}")
+    row()
+    divider("signals")
+    row()
+    row(f"  Memory:     {facts} facts logged")
+    row(f"  Lessons:    {lessons} captured")
+    row(f"  Scaffold:   v{version}{version_hint}  {DIM}({installed_age}){RESET}")
+    row()
+    print(f"  {MAGENTA}╰{'─' * (W+2)}╯{RESET}")
+    print()
+
+    if open_count > 0:
+        print(f"  {BOLD}Next:{RESET}  ./.agent/memory/bd-lite.sh ready")
+    elif blocked > 0:
+        print(f"  {BOLD}Next:{RESET}  Unblock a bead — see ./.agent/memory/BEADS.md")
+    elif done == 0:
+        print(f"  {BOLD}Next:{RESET}  Open your agentic tool, give it a task")
     else:
-        print(f"  {MAGENTA}├{'─' * (W+2)}┤{RESET}")
+        print(f"  {BOLD}Next:{RESET}  All beads drained. Give your agent something new.")
 
-print()
-print(f"  {MAGENTA}╭─ your agent {'─' * (W - 11)}╮{RESET}")
-row()
-row(f"  {BOLD}{name}{RESET}")
-row(f"  {DIM}{purpose}{RESET}")
-row()
-divider("beads")
-row()
-row(f"  {GREEN}●{RESET}  {open_count} open       {DIM}ready to claim{RESET}")
-row(f"  {YELLOW}○{RESET}  {blocked} blocked    {DIM}waiting on something{RESET}")
-row(f"  {DIM}✓{RESET}  {done} done       {DIM}closed with evidence{RESET}")
-row()
-divider("signals")
-row()
-row(f"  Memory:     {facts} facts logged")
-row(f"  Lessons:    {lessons} captured")
-row(f"  Scaffold:   v{version}{version_hint}  {DIM}({installed_age}){RESET}")
-row()
-print(f"  {MAGENTA}╰{'─' * (W+2)}╯{RESET}")
-print()
+    print(f"  {DIM}Help:  cat .agent/HUMAN_GUIDE.md{RESET}")
+    print()
+elif mode == "validate":
+    passes, warnings, failures = validate()
 
-# Action line
-if open_count > 0:
-    print(f"  {BOLD}Next:{RESET}  ./.agent/memory/bd-lite.sh ready")
-elif blocked > 0:
-    print(f"  {BOLD}Next:{RESET}  Unblock a bead — see ./.agent/memory/BEADS.md")
-elif done == 0:
-    print(f"  {BOLD}Next:{RESET}  Open your agentic tool, give it a task")
+    print()
+    print(f"  {BOLD}youragent validate{RESET}")
+    print(f"  {DIM}{agent_dir}{RESET}")
+    print()
+    for msg in passes:
+        print(f"  {GREEN}PASS{RESET}  {msg}")
+    for msg in warnings:
+        print(f"  {YELLOW}WARN{RESET}  {msg}")
+    for msg in failures:
+        print(f"  {RED}FAIL{RESET}  {msg}")
+    print()
+
+    if failures:
+        print(f"  {RED}{BOLD}Result:{RESET} validation failed ({len(failures)} failure(s), {len(warnings)} warning(s))")
+        sys.exit(1)
+    if warnings:
+        print(f"  {YELLOW}{BOLD}Result:{RESET} validation passed with warnings ({len(warnings)})")
+    else:
+        print(f"  {GREEN}{BOLD}Result:{RESET} validation passed cleanly")
+    print()
 else:
-    print(f"  {BOLD}Next:{RESET}  All beads drained. Give your agent something new.")
-
-print(f"  {DIM}Help:  cat .agent/HUMAN_GUIDE.md{RESET}")
-print()
+    raise SystemExit(f"Unknown audit mode: {mode}")
 PY
+}
+
+cmd_status() {
+  run_agent_audit "status" 0
   exit 0
+}
+
+cmd_validate() {
+  run_agent_audit "validate" 1
+  exit $?
 }
 
 if [ "$SUBCOMMAND" = "status" ]; then
@@ -284,6 +438,49 @@ if [ "$SUBCOMMAND" = "status" ]; then
 fi
 
 # ---------- configure-openclaw subcommand ----------
+find_openclaw_configure_script() {
+  local script_entry package_dir target
+  script_entry="${BASH_SOURCE[0]}"
+
+  while [ -L "$script_entry" ]; do
+    target="$(readlink "$script_entry")"
+    case "$target" in
+      /*) script_entry="$target" ;;
+      *) script_entry="$(cd "$(dirname "$script_entry")" 2>/dev/null && pwd)/$target" ;;
+    esac
+  done
+
+  package_dir="$(cd "$(dirname "$script_entry")" 2>/dev/null && pwd -P || echo "")"
+
+  if [ -n "$SRC_DIR" ]; then
+    local local_override="$SRC_DIR/openclaw-configure.sh"
+    if [ -f "$local_override" ]; then
+      printf '%s\n' "$local_override"
+      return 0
+    fi
+    say "${RED}✗${RESET} Local source specified but openclaw-configure.sh not found at $local_override"
+    return 1
+  fi
+
+  if [ -n "$package_dir" ] && [ -f "$package_dir/openclaw-configure.sh" ]; then
+    printf '%s\n' "$package_dir/openclaw-configure.sh"
+    return 0
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    say "${RED}✗${RESET} curl not found and no local openclaw-configure.sh available"
+    return 1
+  fi
+
+  local fetched="/tmp/.openclaw-configure-$$.sh"
+  curl -fsSL "$RAW_BASE/openclaw-configure.sh" -o "$fetched" || {
+    say "${RED}✗${RESET} Failed to fetch openclaw-configure.sh"
+    return 1
+  }
+  chmod +x "$fetched"
+  printf '%s\n' "$fetched"
+}
+
 cmd_configure_openclaw() {
   if [ ! -f "$HOME/.openclaw/openclaw.json" ]; then
     cat <<EOF
@@ -300,32 +497,13 @@ EOF
     exit 1
   fi
 
-  # Determine source mode
   local script_path
+  script_path="$(find_openclaw_configure_script)" || exit 1
 
-  if [ -n "$SRC_DIR" ]; then
-    # Local mode - use local openclaw-configure.sh
-    script_path="$SRC_DIR/openclaw-configure.sh"
-    if [ ! -f "$script_path" ]; then
-      say "${RED}✗${RESET} Local source specified but openclaw-configure.sh not found at $script_path"
-      exit 1
-    fi
-  else
-    # Remote mode - fetch from GitHub
-    script_path="/tmp/.openclaw-configure-$$.sh"
-    curl -fsSL "$RAW_BASE/openclaw-configure.sh" -o "$script_path" || {
-      say "${RED}✗${RESET} Failed to fetch openclaw-configure.sh"
-      exit 1
-    }
-    chmod +x "$script_path"
-  fi
-
-  # Run the configuration script
   "$script_path"
   local exit_code=$?
 
-  # Clean up temp file if we fetched remotely
-  if [ -z "$SRC_DIR" ]; then
+  if [ "${script_path#/tmp/.openclaw-configure-}" != "$script_path" ]; then
     rm -f "$script_path"
   fi
 
@@ -334,6 +512,10 @@ EOF
 
 if [ "$SUBCOMMAND" = "configure-openclaw" ]; then
   cmd_configure_openclaw
+fi
+
+if [ "$SUBCOMMAND" = "validate" ]; then
+  cmd_validate
 fi
 
 banner() {

@@ -121,7 +121,7 @@ while IFS='|' read -r workspace name; do
   fi
 
   # Check if integration already exists (check both markers for idempotency)
-  if grep -q "$INTEGRATION_MARKER" "$AGENTS_MD" || grep -q "$VERSION_MARKER" "$AGENTS_MD"; then
+  if grep -Fq "$INTEGRATION_MARKER" "$AGENTS_MD" || grep -Fq "$VERSION_MARKER" "$AGENTS_MD"; then
     echo "  ${DIM}·${RESET} $name: ${DIM}already configured${RESET}"
     SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
     continue
