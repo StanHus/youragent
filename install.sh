@@ -519,41 +519,79 @@ if [ "$SUBCOMMAND" = "validate" ]; then
 fi
 
 robot_boot() {
+  local target_short="${TARGET_DIR/#$HOME/~}"
   if [ "$NO_ANIM" = "1" ] || [ ! -t 1 ]; then
-    cat <<EOF
-
-${BOLD}${MAGENTA}   a g e n t i z e${RESET}
-   ${CYAN}Your first agent, done right.${RESET}
-   ${DIM}By the Trilogy AI Center of Excellence.${RESET}
-
-EOF
+    printf "\n  ${BOLD}AGENTIZE${RESET}  ${DIM}v%s · %s${RESET}\n" "$SCAFFOLD_VERSION" "$target_short"
+    printf "  ${DIM}local only · no background processes${RESET}\n"
     return
   fi
-  local d=0.09
   printf "\n"
-  printf "        ${CYAN}╭─╮${RESET}\n"; sleep "$d"
-  printf "        ${CYAN}│${RESET}${YELLOW}◉${RESET}${CYAN}│${RESET}     ${DIM}antenna up…${RESET}\n"; sleep "$d"
-  printf "      ${CYAN}╭─┴─┴─╮${RESET}\n"; sleep "$d"
-  printf "      ${CYAN}│ ${DIM}·   ·${RESET}${CYAN} │${RESET}     ${DIM}booting…${RESET}\n"; sleep "$d"
-  # eyes "blink online": rewrite previous line
-  printf "\033[1A\r"
-  printf "      ${CYAN}│ ${GREEN}●${RESET}${CYAN}   ${GREEN}●${RESET}${CYAN} │${RESET}     ${DIM}eyes online${RESET}\n"; sleep "$d"
-  printf "      ${CYAN}│ ${DIM}─────${RESET}${CYAN} │${RESET}     ${DIM}vocoder warm${RESET}\n"; sleep "$d"
-  printf "      ${CYAN}╰─────╯${RESET}\n"; sleep "$d"
-  printf "        ${CYAN}│ │${RESET}\n"; sleep "$d"
-  printf "       ${DIM}agentizing…${RESET}\n"; sleep "$d"
+  printf "      ${CYAN}╭───────╮${RESET}\n"
+  printf "      ${CYAN}│       │${RESET}\n"
+  printf "      ${CYAN}│ ${DIM}─────${RESET}${CYAN} │${RESET}\n"
+  printf "      ${CYAN}╰───────╯${RESET}\n"
+  local slots=("▓────" "─▓───" "──▓──" "───▓─" "────▓" "───▓─" "──▓──")
+  for s in "${slots[@]}"; do
+    printf "\033[2A\r"
+    printf "      ${CYAN}│ ${GREEN}${s}${CYAN} │${RESET}\033[K\n"
+    printf "\033[1B\r"
+    sleep 0.04
+  done
+  printf "\033[2A\r"
+  printf "      ${CYAN}│ ${BOLD}${GREEN}──●──${RESET}${CYAN} │${RESET}\033[K\n"
+  printf "\033[1B\r"
   printf "\n"
-  printf "      ${BOLD}${MAGENTA}a g e n t i z e${RESET}\n"; sleep "$d"
-  printf "      ${CYAN}Your first agent, done right.${RESET}\n"
-  printf "      ${DIM}By the Trilogy AI Center of Excellence.${RESET}\n"
+  printf "  ${BOLD}AGENTIZE${RESET}  ${DIM}v%s  ·  %s${RESET}\n" "$SCAFFOLD_VERSION" "$target_short"
+  printf "  ${DIM}local only · no background processes${RESET}\n"
+}
+
+# ---------- live dashboard ----------
+DASH_MODULES=()
+DASH_DESCS=()
+
+dash_init() {
   printf "\n"
-  printf "  ${DIM}Nothing leaves your machine. Nothing runs in the background.${RESET}\n"
+  printf "  ${BOLD}%-10s  %-40s  %s${RESET}\n" "MODULE" "WHAT" "STATE"
+  printf "  ${DIM}────────────────────────────────────────────────────────────────${RESET}\n"
+  DASH_MODULES=()
+  DASH_DESCS=()
+}
+
+dash_add() {
+  local mod="$1" what="$2"
+  DASH_MODULES+=("$mod")
+  DASH_DESCS+=("$what")
+  printf "  ${DIM}%-10s  %-40s  ░░░░  pending${RESET}\n" "$mod" "$what"
+}
+
+dash_update() {
+  local mod="$1" state="$2" detail="${3:-}"
+  if [ "$NO_ANIM" = "1" ] || [ ! -t 1 ]; then
+    printf "  %-10s  %-40s  %s\n" "$mod" "${detail:-—}" "$state"
+    return
+  fi
+  local i row_idx=-1
+  for ((i=0; i<${#DASH_MODULES[@]}; i++)); do
+    if [ "${DASH_MODULES[$i]}" = "$mod" ]; then row_idx=$i; break; fi
+  done
+  [ "$row_idx" -lt 0 ] && return
+  local total=${#DASH_MODULES[@]}
+  local up=$((total - row_idx))
+  local desc="${DASH_DESCS[$row_idx]}"
+  [ -n "$detail" ] && desc="$detail"
+  printf "\033[${up}A\r"
+  case "$state" in
+    ready) printf "  ${GREEN}${BOLD}%-10s${RESET}  %-40s  ${GREEN}████  ready${RESET}\033[K\n" "$mod" "$desc" ;;
+    warn)  printf "  ${YELLOW}%-10s${RESET}  %-40s  ${YELLOW}▓▓░░  ${detail}${RESET}\033[K\n" "$mod" "${DASH_DESCS[$row_idx]}" ;;
+    skip)  printf "  ${DIM}%-10s  %-40s  ────  ${detail:-skipped}${RESET}\033[K\n" "$mod" "$desc" ;;
+  esac
+  local down=$((up - 1))
+  [ "$down" -gt 0 ] && printf "\033[${down}B\r"
+  return 0
 }
 
 # ---------- preflight + mode detection ----------
 robot_boot
-say "${DIM}Target:${RESET} ${BOLD}${TARGET_DIR}${RESET}"
-hr
 
 INSTALL_MODE="fresh"
 if [ -e "$TARGET_DIR" ]; then
@@ -577,28 +615,11 @@ if [ "$INSTALL_MODE" = "refuse" ]; then
   exit 1
 fi
 
-# Mode-specific intro
+# Mode-specific intro (one line max)
 case "$INSTALL_MODE" in
-  fresh)
-    say "${BOLD}What's about to happen (all local, all markdown):${RESET}"
-    say "  ${CYAN}1.${RESET} Give your agent a ${BOLD}personality${RESET} (SOUL.md) — opinionated, brief, no corporate tone"
-    say "  ${CYAN}2.${RESET} Give your agent an ${BOLD}operating manual${RESET} (AGENT.md) — plan-first, evidence-on-close"
-    say "  ${CYAN}3.${RESET} Build a ${BOLD}memory system${RESET} (long-term + short-term + handoff)"
-    say "  ${CYAN}4.${RESET} Install a ${BOLD}task ledger${RESET} (bd-lite) — beads with dependency + acceptance"
-    say "  ${CYAN}5.${RESET} Drop a ${BOLD}130-pattern catalog${RESET} from 14 COE articles"
-    say "  ${CYAN}6.${RESET} Add ${BOLD}skills${RESET} — substack search with attribution"
-    say "  ${CYAN}7.${RESET} ${BOLD}Wire auto-loads${RESET} — CLAUDE.md / AGENTS.md / .cursorrules / .windsurfrules so your tool reads .agent/ automatically"
-    ;;
-  update)
-    say "${BOLD}${GREEN}✓${RESET} Found an existing agent (installed by youragent). Running a safe update."
-    say "  ${DIM}Scaffold files → refreshed to v${SCAFFOLD_VERSION}.${RESET}"
-    say "  ${DIM}Your personal files (IDENTITY, USER, MEMORY, BEADS, LESSONS_LEARNED, ...) → left untouched.${RESET}"
-    ;;
-  force)
-    say "${YELLOW}!${RESET} ${BOLD}BOOTSTRAP_FORCE=1${RESET} — overwriting everything including your personal files."
-    ;;
+  update) say "${DIM}mode · update · scaffold → v${SCAFFOLD_VERSION}, personal files untouched${RESET}" ;;
+  force)  say "${YELLOW}!${RESET} ${DIM}mode · force · overwriting everything${RESET}" ;;
 esac
-hr
 
 # ---------- source resolution ----------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
@@ -700,148 +721,114 @@ COUNT_REFRESHED=0
 COUNT_KEPT=0
 COUNT_INSTALLED=0
 
-say "${BOLD}Writing scaffold${RESET}"
+# ---------- dashboard + silent install ----------
+dash_init
+dash_add "scaffold" "14 templates, personality + operating"
+dash_add "memory"   "beads, lessons, handoff"
+dash_add "skills"   "substack retrieval w/ attribution"
+dash_add "hooks"    "claude, codex, cursor, windsurf"
+dash_add "runtime"  "python3, npx, git"
+
+# scaffold: core templates
 for t in "${SCAFFOLD_TEMPLATES[@]}"; do
-  bar "$(template_desc "$t")" 10
   fetch_file "templates/${t}.md" "$TARGET_DIR/${t}.md"
   COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
+# scaffold: personal (skip-if-exists)
+for t in "${USER_TEMPLATES[@]}"; do
+  if install_file "templates/${t}.md" "$TARGET_DIR/${t}.md" "1"; then
+    COUNT_INSTALLED=$((COUNT_INSTALLED+1))
+  else
+    COUNT_KEPT=$((COUNT_KEPT+1))
+  fi
+done
+sleep 0.08
+dash_update "scaffold" ready "$((COUNT_REFRESHED + COUNT_INSTALLED)) written, ${COUNT_KEPT} kept"
 
+# memory: scaffold files + user memory
 for f in "${SCAFFOLD_MEMORY[@]}"; do
-  bar "$(memory_desc "$f")" 8
   fetch_file "memory-scaffold/${f}" "$TARGET_DIR/memory/${f}"
   COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
 chmod +x "$TARGET_DIR/memory/bd-lite.sh"
+for f in "${USER_MEMORY[@]}"; do
+  if install_file "memory-scaffold/${f}" "$TARGET_DIR/memory/${f}" "1"; then
+    COUNT_INSTALLED=$((COUNT_INSTALLED+1))
+  else
+    COUNT_KEPT=$((COUNT_KEPT+1))
+  fi
+done
+sleep 0.08
+dash_update "memory" ready "beads, lessons, handoff"
 
+# skills
 for f in "${SKILLS_FILES[@]}"; do
-  bar "$(skill_desc "$f")" 8
   fetch_file "skills-scaffold/${f}" "$TARGET_DIR/skills/${f}"
   COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
 chmod +x "$TARGET_DIR/skills/search-substack.sh"
-
-hr
-if [ "$INSTALL_MODE" = "update" ]; then
-  say "${BOLD}Your personal files${RESET} ${DIM}(untouched)${RESET}"
-else
-  say "${BOLD}Your personal files${RESET} ${DIM}(created once — we'll never overwrite these)${RESET}"
-fi
-
-for t in "${USER_TEMPLATES[@]}"; do
-  dest="$TARGET_DIR/${t}.md"
-  if install_file "templates/${t}.md" "$dest" "1"; then
-    bar "$(template_desc "$t")" 8
-    COUNT_INSTALLED=$((COUNT_INSTALLED+1))
-  else
-    COUNT_KEPT=$((COUNT_KEPT+1))
-  fi
-done
-
-for f in "${USER_MEMORY[@]}"; do
-  dest="$TARGET_DIR/memory/${f}"
-  if install_file "memory-scaffold/${f}" "$dest" "1"; then
-    bar "$(memory_desc "$f")" 8
-    COUNT_INSTALLED=$((COUNT_INSTALLED+1))
-  else
-    COUNT_KEPT=$((COUNT_KEPT+1))
-  fi
-done
-[ "$COUNT_KEPT" -gt 0 ] && say "  ${DIM}${COUNT_KEPT} kept safe${RESET}"
+sleep 0.08
+dash_update "skills" ready "substack search + attribution"
 
 # Write marker
 printf "youragent-scaffold\nversion=%s\ninstalled=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MARKER_FILE"
 
-hr
-
-# ---------- tool auto-wire hooks ----------
+# hooks: auto-wire (silent, collect warnings)
 REPO_ROOT="${TARGET_DIR%/.agent}"
-say "${BOLD}Wiring tool auto-loads${RESET}"
-
+HOOK_WARN=()
 hook_install() {
   local hookfile="$1" tool="$2"
   local dest="$REPO_ROOT/$hookfile"
   if [ -e "$dest" ]; then
     if grep -qE "youragent|NORTH_STAR\.md|\.agent/" "$dest" 2>/dev/null; then
-      say "  ${GREEN}✓${RESET} $hookfile ${DIM}(already linked to the scaffold)${RESET}"
-    else
-      say "  ${YELLOW}!${RESET} $hookfile exists but doesn't reference .agent/."
-      say "     ${DIM}Add this line so $tool reads the scaffold:${RESET}"
-      say "         ${BOLD}See .agent/NORTH_STAR.md first.${RESET}"
+      return  # already linked
     fi
+    HOOK_WARN+=("$hookfile exists but doesn't reference .agent/ — add: ‘See .agent/NORTH_STAR.md first.’")
     return
   fi
   fetch_file "hooks-scaffold/$hookfile" "$dest"
-  say "  ${GREEN}✓${RESET} $hookfile ${DIM}($tool reads this automatically)${RESET}"
 }
-
-hook_install "CLAUDE.md" "Claude Code"
-hook_install "AGENTS.md" "Codex"
+hook_install "CLAUDE.md"    "Claude Code"
+hook_install "AGENTS.md"    "Codex"
 hook_install ".cursorrules" "Cursor"
 hook_install ".windsurfrules" "Windsurf"
-
-# ---------- runtime dep probes (only surface missing tools) ----------
-_missing=()
-command -v python3 >/dev/null 2>&1 || _missing+=("${RED}!${RESET} ${BOLD}python3${RESET} missing — bd-lite (task ledger) needs it")
-command -v npx     >/dev/null 2>&1 || _missing+=("${YELLOW}!${RESET} ${BOLD}npx${RESET} missing — install Node.js for the wwvcd skill")
-command -v git     >/dev/null 2>&1 || _missing+=("${YELLOW}!${RESET} ${BOLD}git${RESET} missing — install for version control")
-if [ ${#_missing[@]} -gt 0 ]; then
-  hr
-  say "${BOLD}Heads up${RESET}"
-  for m in "${_missing[@]}"; do say "  $m"; done
-fi
-
-hr
-
-# ---------- OpenClaw integration prompt ----------
-if [ -f "$HOME/.openclaw/openclaw.json" ] && [ "$INSTALL_MODE" = "fresh" ]; then
-  say "${BOLD}OpenClaw Detected${RESET}"
-  say ""
-  say "  ${DIM}Configure your OpenClaw agents to auto-read .agent/ folders:${RESET}"
-  say "  ${BOLD}npx agentize configure-openclaw${RESET}"
-  say ""
-  hr
-fi
-
-# ---------- final message ----------
-if [ "$INSTALL_MODE" = "update" ]; then
-  cat <<EOF
-
-${BOLD}${GREEN}  Done. Scaffold updated to v${SCAFFOLD_VERSION}.${RESET}
-
-  ${BOLD}Refreshed:${RESET} ${COUNT_REFRESHED} tool-authored files
-  ${BOLD}Kept safe:${RESET} ${COUNT_KEPT} personal files ${DIM}(your agent's name, memory, beads, lessons)${RESET}
-
-  ${DIM}Re-run \`npx agentize\` anytime — updates are always safe.${RESET}
-
-EOF
+sleep 0.08
+if [ ${#HOOK_WARN[@]} -gt 0 ]; then
+  dash_update "hooks" warn "${#HOOK_WARN[@]} hook(s) need a manual line"
 else
-  cat <<EOF
-
-${BOLD}${GREEN}  Done. Your repo has an agent.${RESET}
-
-${BOLD}You're set. Two things to do:${RESET}
-  ${CYAN}1.${RESET} Open your agentic tool in this repo ${DIM}(Claude Code / Codex / Cursor / Windsurf auto-load via the hook files)${RESET}
-  ${CYAN}2.${RESET} Give it a real task. Watch it close beads with evidence.
-
-${DIM}Aider: paste "Read .agent/NORTH_STAR.md to orient" at session start.${RESET}
-${DIM}OpenClaw: run ${BOLD}npx agentize configure-openclaw${RESET}${DIM} to auto-configure all agents.${RESET}
-
-${DIM}First time with agents? .agent/GETTING_STARTED.md (10 min).${RESET}
-${DIM}Curious what the agent knows? .agent/PATTERNS_CATALOG.md — 130 patterns inherited from the COE.${RESET}
-
-${BOLD}Autonomous mode${RESET} ${DIM}(once you trust it — usually after 2-3 tasks)${RESET}
-  Claude Code:     ${BOLD}claude --dangerously-skip-permissions${RESET}
-  Codex:           ${BOLD}codex --yolo${RESET}
-  Aider:           ${BOLD}aider --yes${RESET}
-  Cursor/Windsurf: agent mode with auto-approve in settings
-
-${BOLD}Next level${RESET}
-  ${BOLD}.agent/GOGCLI_STARTER.md${RESET} wires the agent into your Gmail / Docs / Calendar.
-  This is where "neat" becomes "runs my inbox while I sleep."
-
-${DIM}Personality too sharp? .agent/TWEAKING.md shows how to dial it.${RESET}
-${DIM}Built by Trilogy AI COE — trilogyai.substack.com.${RESET}
-
-EOF
+  dash_update "hooks" ready "claude, codex, cursor, windsurf"
 fi
+
+# runtime
+RUNTIME_WARN=()
+command -v python3 >/dev/null 2>&1 || RUNTIME_WARN+=("python3")
+command -v npx     >/dev/null 2>&1 || RUNTIME_WARN+=("npx")
+command -v git     >/dev/null 2>&1 || RUNTIME_WARN+=("git")
+sleep 0.08
+if [ ${#RUNTIME_WARN[@]} -gt 0 ]; then
+  dash_update "runtime" warn "missing: ${RUNTIME_WARN[*]}"
+else
+  dash_update "runtime" ready "python3, npx, git"
+fi
+
+# surface any hook warnings below the dashboard
+if [ ${#HOOK_WARN[@]} -gt 0 ]; then
+  printf "\n"
+  for w in "${HOOK_WARN[@]}"; do
+    printf "  ${YELLOW}!${RESET} ${DIM}%s${RESET}\n" "$w"
+  done
+fi
+
+# ---------- final compact footer ----------
+printf "\n"
+if [ "$INSTALL_MODE" = "update" ]; then
+  printf "  ${GREEN}${BOLD}agentized${RESET}  ${DIM}→  updated to v%s · re-run anytime${RESET}\n" "$SCAFFOLD_VERSION"
+else
+  printf "  ${GREEN}${BOLD}agentized${RESET}  ${DIM}→  open your agentic tool · give it a real task${RESET}\n"
+fi
+# One-line pointers (OpenClaw conditional, rest always useful)
+printf "  ${DIM}next · .agent/NORTH_STAR.md (orient) · .agent/GETTING_STARTED.md (10 min)${RESET}\n"
+if [ -f "$HOME/.openclaw/openclaw.json" ] && [ "$INSTALL_MODE" = "fresh" ]; then
+  printf "  ${DIM}openclaw detected · ${BOLD}npx agentize configure-openclaw${RESET}${DIM} to wire your agents${RESET}\n"
+fi
+printf "\n"
