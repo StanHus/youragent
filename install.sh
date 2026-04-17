@@ -518,25 +518,40 @@ if [ "$SUBCOMMAND" = "validate" ]; then
   cmd_validate
 fi
 
-banner() {
-  cat <<EOF
+robot_boot() {
+  if [ "$NO_ANIM" = "1" ] || [ ! -t 1 ]; then
+    cat <<EOF
 
-${BOLD}${MAGENTA}
-   ┌─────────────────────────────────────────────────────┐
-   │                                                     │
-   │           y o u r   a g e n t                       │
-   │                                                     │
-   │   ${CYAN}Your first agent, done right.${MAGENTA}                     │
-   │   ${DIM}By the Trilogy AI Center of Excellence.${MAGENTA}            │
-   │                                                     │
-   └─────────────────────────────────────────────────────┘
-${RESET}
-  ${DIM}Nothing leaves your machine. Nothing runs in the background.${RESET}
+${BOLD}${MAGENTA}   a g e n t i z e${RESET}
+   ${CYAN}Your first agent, done right.${RESET}
+   ${DIM}By the Trilogy AI Center of Excellence.${RESET}
+
 EOF
+    return
+  fi
+  local d=0.09
+  printf "\n"
+  printf "        ${CYAN}╭─╮${RESET}\n"; sleep "$d"
+  printf "        ${CYAN}│${RESET}${YELLOW}◉${RESET}${CYAN}│${RESET}     ${DIM}antenna up…${RESET}\n"; sleep "$d"
+  printf "      ${CYAN}╭─┴─┴─╮${RESET}\n"; sleep "$d"
+  printf "      ${CYAN}│ ${DIM}·   ·${RESET}${CYAN} │${RESET}     ${DIM}booting…${RESET}\n"; sleep "$d"
+  # eyes "blink online": rewrite previous line
+  printf "\033[1A\r"
+  printf "      ${CYAN}│ ${GREEN}●${RESET}${CYAN}   ${GREEN}●${RESET}${CYAN} │${RESET}     ${DIM}eyes online${RESET}\n"; sleep "$d"
+  printf "      ${CYAN}│ ${DIM}─────${RESET}${CYAN} │${RESET}     ${DIM}vocoder warm${RESET}\n"; sleep "$d"
+  printf "      ${CYAN}╰─────╯${RESET}\n"; sleep "$d"
+  printf "        ${CYAN}│ │${RESET}\n"; sleep "$d"
+  printf "       ${DIM}agentizing…${RESET}\n"; sleep "$d"
+  printf "\n"
+  printf "      ${BOLD}${MAGENTA}a g e n t i z e${RESET}\n"; sleep "$d"
+  printf "      ${CYAN}Your first agent, done right.${RESET}\n"
+  printf "      ${DIM}By the Trilogy AI Center of Excellence.${RESET}\n"
+  printf "\n"
+  printf "  ${DIM}Nothing leaves your machine. Nothing runs in the background.${RESET}\n"
 }
 
 # ---------- preflight + mode detection ----------
-banner
+robot_boot
 say "${DIM}Target:${RESET} ${BOLD}${TARGET_DIR}${RESET}"
 hr
 
@@ -591,7 +606,6 @@ SOURCE_MODE=""
 
 resolve_src() {
   if [ -n "$SRC_DIR" ]; then
-    say "${BOLD}Source:${RESET} local override → ${SRC_DIR}"
     if [ ! -d "$SRC_DIR/templates" ]; then
       say "${RED}✗${RESET} BOOTSTRAP_LOCAL_SRC set but $SRC_DIR/templates/ is missing"
       exit 1
@@ -601,13 +615,12 @@ resolve_src() {
   fi
 
   if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/templates" ] && [ -d "$SCRIPT_DIR/memory-scaffold" ]; then
-    say "${BOLD}Source:${RESET} package-local → ${SCRIPT_DIR}"
     SRC_DIR="$SCRIPT_DIR"
     SOURCE_MODE="local"
     return
   fi
 
-  say "${BOLD}Source:${RESET} remote (curl) → ${RAW_BASE}"
+  say "  ${DIM}Fetching from GitHub…${RESET}"
   if ! command -v curl >/dev/null 2>&1; then
     say "${RED}✗${RESET} curl not found. Install curl (it's on basically every system)."
     exit 1
@@ -628,7 +641,6 @@ fetch_file() {
 }
 
 resolve_src
-hr
 
 # ---------- install ----------
 mkdir -p "$TARGET_DIR/memory/BACKUPS" "$TARGET_DIR/memory/archives" "$TARGET_DIR/skills"
@@ -688,7 +700,7 @@ COUNT_REFRESHED=0
 COUNT_KEPT=0
 COUNT_INSTALLED=0
 
-say "${BOLD}Installing scaffold (tool-owned files)${RESET}"
+say "${BOLD}Writing scaffold${RESET}"
 for t in "${SCAFFOLD_TEMPLATES[@]}"; do
   bar "$(template_desc "$t")" 10
   fetch_file "templates/${t}.md" "$TARGET_DIR/${t}.md"
@@ -711,9 +723,9 @@ chmod +x "$TARGET_DIR/skills/search-substack.sh"
 
 hr
 if [ "$INSTALL_MODE" = "update" ]; then
-  say "${BOLD}Checking your personal files (we don't touch these)${RESET}"
+  say "${BOLD}Your personal files${RESET} ${DIM}(untouched)${RESET}"
 else
-  say "${BOLD}Initializing your personal files (one-time, we'll never touch these again)${RESET}"
+  say "${BOLD}Your personal files${RESET} ${DIM}(created once — we'll never overwrite these)${RESET}"
 fi
 
 for t in "${USER_TEMPLATES[@]}"; do
@@ -722,7 +734,6 @@ for t in "${USER_TEMPLATES[@]}"; do
     bar "$(template_desc "$t")" 8
     COUNT_INSTALLED=$((COUNT_INSTALLED+1))
   else
-    say "  ${DIM}· kept:${RESET} $(template_desc "$t")"
     COUNT_KEPT=$((COUNT_KEPT+1))
   fi
 done
@@ -733,10 +744,10 @@ for f in "${USER_MEMORY[@]}"; do
     bar "$(memory_desc "$f")" 8
     COUNT_INSTALLED=$((COUNT_INSTALLED+1))
   else
-    say "  ${DIM}· kept:${RESET} $(memory_desc "$f")"
     COUNT_KEPT=$((COUNT_KEPT+1))
   fi
 done
+[ "$COUNT_KEPT" -gt 0 ] && say "  ${DIM}${COUNT_KEPT} kept safe${RESET}"
 
 # Write marker
 printf "youragent-scaffold\nversion=%s\ninstalled=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MARKER_FILE"
@@ -769,26 +780,15 @@ hook_install "AGENTS.md" "Codex"
 hook_install ".cursorrules" "Cursor"
 hook_install ".windsurfrules" "Windsurf"
 
-hr
-
-# ---------- runtime dep probes ----------
-say "${BOLD}Runtime checks${RESET}"
-if command -v python3 >/dev/null 2>&1; then
-  say "  ${GREEN}✓${RESET} python3 available — bd-lite ready"
-else
-  say "  ${RED}!${RESET} ${BOLD}python3 not found${RESET} — bd-lite needs it. Install python3 before using the bead ledger."
-fi
-
-if command -v npx >/dev/null 2>&1; then
-  say "  ${GREEN}✓${RESET} npx available — ${BOLD}npx wwvcd${RESET} retrieval skill ready"
-else
-  say "  ${YELLOW}!${RESET} npx not found — install Node.js for WWVCD retrieval"
-fi
-
-if command -v git >/dev/null 2>&1; then
-  say "  ${GREEN}✓${RESET} git available"
-else
-  say "  ${YELLOW}!${RESET} git missing — install for version control + rollback safety"
+# ---------- runtime dep probes (only surface missing tools) ----------
+_missing=()
+command -v python3 >/dev/null 2>&1 || _missing+=("${RED}!${RESET} ${BOLD}python3${RESET} missing — bd-lite (task ledger) needs it")
+command -v npx     >/dev/null 2>&1 || _missing+=("${YELLOW}!${RESET} ${BOLD}npx${RESET} missing — install Node.js for the wwvcd skill")
+command -v git     >/dev/null 2>&1 || _missing+=("${YELLOW}!${RESET} ${BOLD}git${RESET} missing — install for version control")
+if [ ${#_missing[@]} -gt 0 ]; then
+  hr
+  say "${BOLD}Heads up${RESET}"
+  for m in "${_missing[@]}"; do say "  $m"; done
 fi
 
 hr
