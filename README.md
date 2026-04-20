@@ -4,9 +4,12 @@
 >
 > This isn't "set up a folder." This ships the **[Trilogy AI Center of Excellence](https://trilogyai.substack.com/) methodology** on top of a bead-graph task system inspired by **[Steve Yegge's Beads](https://github.com/steveyegge/beads)** — spiky takes, evidence-on-close, and a 130-pattern knowledge base your agent inherits on install.
 
-[![npm](https://img.shields.io/npm/v/agentize.svg)](https://www.npmjs.com/package/agentize)
-[![downloads](https://img.shields.io/npm/dm/agentize.svg)](https://npm-stat.com/charts.html?package=agentize)
+[![npm](https://img.shields.io/npm/v/agentize.svg?label=agentize)](https://www.npmjs.com/package/agentize)
+[![total downloads agentize](https://img.shields.io/npm/dt/agentize.svg?label=agentize%20downloads)](https://www.npmjs.com/package/agentize)
+[![total downloads youragent](https://img.shields.io/npm/dt/youragent.svg?label=youragent%20downloads%20(legacy))](https://www.npmjs.com/package/youragent)
 [![license](https://img.shields.io/npm/l/agentize.svg)](./LICENSE)
+
+> **Cumulative reach:** this package was first published as [`youragent`](https://www.npmjs.com/package/youragent) and later renamed to [`agentize`](https://www.npmjs.com/package/agentize). Both badges above count toward the same project — add them together for the real number.
 
 ## Demo
 
