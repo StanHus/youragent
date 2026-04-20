@@ -1,6 +1,6 @@
 {
   "name": "agentize",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "Make an agent. One line, any repo. Drops a .agent/ scaffold — personality, memory, bead-graph task ledger, and a 130-pattern knowledge catalog — into any codebase. Built by the Trilogy AI Center of Excellence. Tool-agnostic: Claude Code, Codex, Cursor, OpenClaw, Aider, Windsurf. Also published as `youragent` (legacy alias — same package).",
   "bin": {
     "agentize": "bin/agentize.js",

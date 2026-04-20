@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.4.2"
+SCAFFOLD_VERSION="1.5.0"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -34,7 +34,7 @@ SCAFFOLD_TEMPLATES=(SOUL AGENT TOOLS NORTH_STAR HUMAN_GUIDE TWEAKING KNOWLEDGE_P
 USER_TEMPLATES=(IDENTITY USER MEMORY LESSONS_LEARNED)
 SCAFFOLD_MEMORY=(README.md bd-lite.sh)
 USER_MEMORY=(BEADS.md PROMPTS.md HANDOFF.md SHORT_TERM_MEMORY.md)
-SKILLS_FILES=(search-substack.sh README.md)
+SKILLS_FILES=(search-substack.sh memory-search.sh README.md)
 
 # ---------- colors ----------
 if [ -t 1 ] && [ "$NO_ANIM" != "1" ]; then
@@ -689,6 +689,41 @@ fetch_latest_npm_version() {
     | awk -F'"version":"' 'NF>1{split($2,a,"\""); print a[1]; exit}'
 }
 
+# ---------- OpenClaw detection gate ----------
+# Single source of truth: "is there a real OpenClaw instance to link up with?"
+# Every OpenClaw-aware code path must check this first. If false, bail cleanly.
+# Returns 0 if an OpenClaw config exists at the default path AND has >= 1 agent.
+openclaw_present() {
+  local cfg="$HOME/.openclaw/openclaw.json"
+  [ -f "$cfg" ] || return 1
+  command -v python3 >/dev/null 2>&1 || return 1
+  python3 - "$cfg" <<'PYEOF' >/dev/null 2>&1 || return 1
+import json, sys
+with open(sys.argv[1]) as f: cfg = json.load(f)
+agents = cfg.get("agents", {}).get("list", [])
+sys.exit(0 if any(a.get("workspace") for a in agents) else 1)
+PYEOF
+  return 0
+}
+
+# Iterate OpenClaw agents (workspace|name per line). Silent if none.
+openclaw_agents() {
+  local cfg="$HOME/.openclaw/openclaw.json"
+  [ -f "$cfg" ] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  python3 - "$cfg" <<'PYEOF'
+import json, sys
+try:
+    with open(sys.argv[1]) as f: cfg = json.load(f)
+    for a in cfg.get("agents", {}).get("list", []):
+        ws = a.get("workspace", "")
+        nm = a.get("identity", {}).get("name", a.get("id", "unknown"))
+        if ws: print(f"{ws}|{nm}")
+except Exception:
+    pass
+PYEOF
+}
+
 cmd_update_check() {
   if [ -t 1 ] && [ "${NO_ANIM:-0}" != "1" ]; then
     BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
@@ -719,6 +754,124 @@ cmd_update_check() {
 
 if [ "$SUBCOMMAND" = "update-check" ] || [ "$SUBCOMMAND" = "check-updates" ]; then
   cmd_update_check
+fi
+
+cmd_openclaw_check() {
+  if [ -t 1 ] && [ "${NO_ANIM:-0}" != "1" ]; then
+    BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+    GREEN=$'\033[32m'; YELLOW=$'\033[33m'; RED=$'\033[31m'; CYAN=$'\033[36m'; MAGENTA=$'\033[35m'
+  else
+    BOLD=""; DIM=""; RESET=""; GREEN=""; YELLOW=""; RED=""; CYAN=""; MAGENTA=""
+  fi
+  if ! openclaw_present; then
+    printf "\n  ${DIM}no openclaw instance detected at ~/.openclaw/openclaw.json${RESET}\n"
+    printf "  ${DIM}(nothing to check — this subcommand only runs when openclaw is installed)${RESET}\n\n"
+    exit 0
+  fi
+
+  printf "\n  ${BOLD}openclaw-check${RESET}  ${DIM}drift report (read-only)${RESET}\n"
+  printf "  ${DIM}───────────────────────────────────────────────────────${RESET}\n"
+
+  local total=0 wired=0 drift=0 missing=0 outdated=0
+  while IFS='|' read -r workspace name; do
+    [ -z "$workspace" ] && continue
+    total=$((total+1))
+    local agents_md="$workspace/AGENTS.md"
+    if [ ! -f "$agents_md" ]; then
+      printf "  ${RED}missing${RESET}  %-20s  ${DIM}%s/AGENTS.md not found${RESET}\n" "$name" "$workspace"
+      missing=$((missing+1))
+      continue
+    fi
+    # Look for any of our markers (v1, v2…)
+    if grep -Fq '<!-- youragent-openclaw-v2 -->' "$agents_md" 2>/dev/null; then
+      printf "  ${GREEN}ok${RESET}       %-20s  ${DIM}v2 marker present${RESET}\n" "$name"
+      wired=$((wired+1))
+    elif grep -Fq '<!-- youragent-openclaw-v1 -->' "$agents_md" 2>/dev/null; then
+      printf "  ${YELLOW}outdated${RESET} %-20s  ${DIM}v1 marker — run configure-openclaw to upgrade${RESET}\n" "$name"
+      outdated=$((outdated+1))
+    elif grep -Fq '## Working in Code Repositories (YourAgent Integration)' "$agents_md" 2>/dev/null; then
+      printf "  ${YELLOW}drift${RESET}    %-20s  ${DIM}integration header present but no version marker${RESET}\n" "$name"
+      drift=$((drift+1))
+    else
+      printf "  ${RED}unwired${RESET}  %-20s  ${DIM}no integration markers${RESET}\n" "$name"
+      missing=$((missing+1))
+    fi
+  done < <(openclaw_agents)
+
+  printf "  ${DIM}───────────────────────────────────────────────────────${RESET}\n"
+  printf "  ${DIM}%d total · %d ok · %d outdated · %d drifted · %d unwired${RESET}\n" "$total" "$wired" "$outdated" "$drift" "$missing"
+  if [ "$outdated" -gt 0 ] || [ "$missing" -gt 0 ]; then
+    printf "  ${DIM}fix with${RESET}  ${BOLD}${MAGENTA}npx agentize configure-openclaw${RESET}\n\n"
+    exit 1
+  fi
+  printf "\n"
+  exit 0
+}
+
+if [ "$SUBCOMMAND" = "openclaw-check" ] || [ "$SUBCOMMAND" = "check-openclaw" ]; then
+  cmd_openclaw_check
+fi
+
+cmd_from_openclaw() {
+  # Reverse install: run this inside an OpenClaw agent's workspace to seed
+  # a .agent/ scaffold using the agent's identity + purpose as defaults.
+  # Gate: openclaw.json MUST exist AND current $PWD MUST be a known workspace.
+  if [ -t 1 ] && [ "${NO_ANIM:-0}" != "1" ]; then
+    BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+    GREEN=$'\033[32m'; YELLOW=$'\033[33m'; RED=$'\033[31m'; CYAN=$'\033[36m'; MAGENTA=$'\033[35m'
+  else
+    BOLD=""; DIM=""; RESET=""; GREEN=""; YELLOW=""; RED=""; CYAN=""; MAGENTA=""
+  fi
+  if ! openclaw_present; then
+    printf "\n  ${RED}no openclaw instance detected${RESET}  ${DIM}~/.openclaw/openclaw.json missing or empty${RESET}\n"
+    printf "  ${DIM}this subcommand is only for users who already have openclaw running${RESET}\n\n"
+    exit 1
+  fi
+  local agent_name="" agent_purpose="" pyline=""
+  # Resolve current workspace → agent identity from openclaw.json.
+  if command -v python3 >/dev/null 2>&1; then
+    pyline=$(python3 - "$HOME/.openclaw/openclaw.json" "$PWD" <<'PYEOF' || true
+import json, os, sys
+try:
+    cfg_path, pwd = sys.argv[1], os.path.realpath(sys.argv[2])
+    with open(cfg_path) as f: cfg = json.load(f)
+    for a in cfg.get("agents", {}).get("list", []):
+        ws = a.get("workspace", "")
+        if ws and os.path.realpath(ws) == pwd:
+            ident = a.get("identity", {})
+            nm = ident.get("name", a.get("id", ""))
+            pp = ident.get("purpose") or ident.get("role") or ""
+            print(f"{nm}\t{pp}")
+            break
+except Exception:
+    pass
+PYEOF
+    )
+    if [ -n "$pyline" ]; then
+      agent_name="${pyline%%$'\t'*}"
+      agent_purpose="${pyline#*$'\t'}"
+      [ "$agent_purpose" = "$pyline" ] && agent_purpose=""
+    fi
+  fi
+  if [ -z "$agent_name" ]; then
+    printf "\n  ${YELLOW}cwd isn't a registered openclaw workspace${RESET}\n"
+    printf "  ${DIM}run ${BOLD}npx agentize from-openclaw${RESET}${DIM} from inside one of your agents' workspace dirs${RESET}\n"
+    printf "  ${DIM}or use ${BOLD}${MAGENTA}npx agentize${RESET}${DIM} for a regular install${RESET}\n\n"
+    exit 1
+  fi
+
+  printf "\n  ${BOLD}from-openclaw${RESET}  ${DIM}seeding .agent/ with identity from${RESET} ${BOLD}%s${RESET}\n" "$agent_name"
+  # Run a normal install, then patch IDENTITY.md with agent's name + purpose.
+  export AGENTIZE_FROM_OPENCLAW_NAME="$agent_name"
+  export AGENTIZE_FROM_OPENCLAW_PURPOSE="$agent_purpose"
+  # Re-exec ourselves as a normal install with the env vars set; the install
+  # flow (below) will see them and seed IDENTITY.md.
+  SUBCOMMAND="install"
+  # fall through
+}
+
+if [ "$SUBCOMMAND" = "from-openclaw" ]; then
+  cmd_from_openclaw
 fi
 
 greet() {
@@ -935,6 +1088,20 @@ done
 for t in "${USER_TEMPLATES[@]}"; do
   if install_file "templates/${t}.md" "$TARGET_DIR/${t}.md" "1"; then
     COUNT_INSTALLED=$((COUNT_INSTALLED+1))
+    # If we just created IDENTITY.md AND we were invoked via from-openclaw,
+    # seed the file with the agent's name + purpose instead of the generic
+    # template. Only writes on fresh creation; never overwrites.
+    if [ "$t" = "IDENTITY" ] && [ -n "${AGENTIZE_FROM_OPENCLAW_NAME:-}" ]; then
+      {
+        printf '# IDENTITY.md\n\n## Name\n\n**%s**\n\n## Purpose\n\n' "$AGENTIZE_FROM_OPENCLAW_NAME"
+        if [ -n "${AGENTIZE_FROM_OPENCLAW_PURPOSE:-}" ]; then
+          printf '%s\n' "$AGENTIZE_FROM_OPENCLAW_PURPOSE"
+        else
+          printf '(seeded from openclaw workspace — edit to taste)\n'
+        fi
+        printf '\n<!-- seeded-from-openclaw -->\n'
+      } > "$TARGET_DIR/${t}.md"
+    fi
   else
     COUNT_KEPT=$((COUNT_KEPT+1))
   fi
@@ -964,6 +1131,7 @@ for f in "${SKILLS_FILES[@]}"; do
   COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
 chmod +x "$TARGET_DIR/skills/search-substack.sh"
+chmod +x "$TARGET_DIR/skills/memory-search.sh" 2>/dev/null || true
 
 # Ensure wwvcd (retrieval skill) is available. Try global install first;
 # fall back to warming the npx cache; silently accept if neither works
@@ -992,6 +1160,108 @@ esac
 
 # Write marker
 printf "youragent-scaffold\nversion=%s\ninstalled=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MARKER_FILE"
+
+# --- OpenClaw-aware extras (only if there's an openclaw instance to link to) ---
+# Drops .agent/OPENCLAW.md (guidance) + .agent/openclaw/{BRIDGE,GLOBAL_NOTES}.md
+# (bidirectional bridge). Non-breaking: skipped entirely when openclaw isn't
+# installed. Personal files never overwritten.
+OPENCLAW_SCAFFOLDED="no"
+if openclaw_present; then
+  mkdir -p "$TARGET_DIR/openclaw"
+  # OPENCLAW.md — scaffold-level guidance (tool-authored, refresh-safe)
+  cat > "$TARGET_DIR/OPENCLAW.md" <<'OCLAW'
+# OPENCLAW.md
+
+This repo was scaffolded with agentize on a machine running OpenClaw.
+Your agent (from ~/.openclaw/openclaw.json) has global identity + memory;
+this repo adds a local operating context that layers on top of it.
+
+## Memory routing
+
+| Scope                                | File                                                 |
+|--------------------------------------|------------------------------------------------------|
+| Global (user prefs, cross-repo)      | `$openclaw_workspace/memory/`                        |
+| Local to this repo                   | `.agent/MEMORY.md`                                   |
+| Session scratch / handoff            | `.agent/memory/HANDOFF.md`                           |
+| Lessons applicable everywhere        | Both: `.agent/LESSONS_LEARNED.md` + global memory    |
+
+When in doubt: if the fact starts with "in this repo…", it's local.
+
+## Bridge files
+
+- `.agent/openclaw/BRIDGE.md` — per-repo overrides to global personality.
+- `.agent/openclaw/GLOBAL_NOTES.md` — write things here that the agent
+  should push into its global memory at session end (think HANDOFF for
+  the OpenClaw layer).
+
+## Cross-session protocol
+
+1. On entering this repo, read `.agent/NORTH_STAR.md` → `.agent/openclaw/BRIDGE.md`.
+2. Work beads from `.agent/memory/BEADS.md` with evidence-on-close.
+3. Before exiting, append anything globally useful to `.agent/openclaw/GLOBAL_NOTES.md`.
+4. The next session picks up where you left off — in this repo or the next.
+OCLAW
+
+  # BRIDGE.md (personal, skip-if-exists)
+  if [ ! -f "$TARGET_DIR/openclaw/BRIDGE.md" ]; then
+    cat > "$TARGET_DIR/openclaw/BRIDGE.md" <<'BRIDGE'
+# BRIDGE.md
+
+Per-repo overrides to your OpenClaw agent's global personality + rules.
+Agent reads this on entry to layer on top of its workspace identity.
+
+## Personality overrides for THIS repo
+
+<!-- Examples — delete or replace with your actual rules:
+- extra paranoid about database migrations
+- strict about evidence in bead closes — require test output, not just "passed"
+- never run destructive git commands without explicit confirmation
+-->
+(none — using global defaults)
+
+## Tool / skill overrides
+
+<!-- Example: - prefer `rg` over `grep` here; `wwvcd` over ad-hoc research -->
+(none)
+
+## Handoff expectations
+
+<!-- Example: - always update memory/HANDOFF.md before ending session -->
+(none)
+BRIDGE
+    COUNT_INSTALLED=$((COUNT_INSTALLED+1))
+  else
+    COUNT_KEPT=$((COUNT_KEPT+1))
+  fi
+
+  # GLOBAL_NOTES.md (personal, skip-if-exists)
+  if [ ! -f "$TARGET_DIR/openclaw/GLOBAL_NOTES.md" ]; then
+    cat > "$TARGET_DIR/openclaw/GLOBAL_NOTES.md" <<'GNOTES'
+# GLOBAL_NOTES.md
+
+Things learned HERE that belong in the agent's GLOBAL memory
+($openclaw_workspace/memory/). Append-only during the session; the
+agent should flush these to global memory before exiting the repo.
+
+## Session log
+
+<!-- Format: `YYYY-MM-DD · one-line takeaway that generalizes beyond this repo` -->
+
+(empty)
+
+## Promoted to global on
+
+<!-- Last time the agent actually pushed entries upstream: `YYYY-MM-DD` -->
+
+(never)
+GNOTES
+    COUNT_INSTALLED=$((COUNT_INSTALLED+1))
+  else
+    COUNT_KEPT=$((COUNT_KEPT+1))
+  fi
+  COUNT_REFRESHED=$((COUNT_REFRESHED+1))  # OPENCLAW.md itself
+  OPENCLAW_SCAFFOLDED="yes"
+fi
 
 # hooks: auto-wire (silent, collect warnings)
 REPO_ROOT="${TARGET_DIR%/.agent}"
@@ -1083,7 +1353,10 @@ row_reveal "  ${DIM}  GOGCLI_STARTER    Gmail / Docs / Calendar on-ramp${RESET}"
 row_reveal "  ${DIM}  GETTING_STARTED   first-time agentic onboarding (10 min)${RESET}"
 row_reveal "  ${DIM}  memory/README     bead rules${RESET}"
 row_reveal "  ${DIM}  memory/bd-lite.sh bead CLI (python3)${RESET}"
-row_reveal "  ${DIM}  skills/README + skills/search-substack.sh (source retrieval, cited)${RESET}"
+row_reveal "  ${DIM}  skills/README + skills/search-substack.sh + skills/memory-search.sh${RESET}"
+if [ "${OPENCLAW_SCAFFOLDED:-no}" = "yes" ]; then
+  row_reveal "  ${DIM}  OPENCLAW.md       OpenClaw memory routing + bridge guidance${RESET}"
+fi
 row_reveal ""
 row_reveal "  ${BOLD}PERSONAL${RESET}  ${DIM}yours · created once · never overwritten${RESET}"
 row_reveal "  ${DIM}  IDENTITY          your agent's name + purpose${RESET}"
@@ -1093,6 +1366,10 @@ row_reveal "  ${DIM}  MEMORY            long-term facts${RESET}"
 row_reveal "  ${DIM}  LESSONS_LEARNED   mistake log${RESET}"
 row_reveal "  ${DIM}  memory/BEADS      task ledger (the agent closes these with evidence)${RESET}"
 row_reveal "  ${DIM}  memory/PROMPTS · memory/HANDOFF · memory/SHORT_TERM_MEMORY${RESET}"
+if [ "${OPENCLAW_SCAFFOLDED:-no}" = "yes" ]; then
+  row_reveal "  ${DIM}  openclaw/BRIDGE.md        per-repo overrides to global personality${RESET}"
+  row_reveal "  ${DIM}  openclaw/GLOBAL_NOTES.md  things to promote into global memory${RESET}"
+fi
 
 # --- panel: auto-wired hooks ---
 panel "AUTO-WIRED HOOKS"
@@ -1163,6 +1440,10 @@ row_reveal "  ${MAGENTA}npx agentize status${RESET}         ${DIM}what your agen
 row_reveal "  ${MAGENTA}npx agentize validate${RESET}       ${DIM}scaffold health check${RESET}"
 row_reveal "  ${MAGENTA}npx agentize update-check${RESET}   ${DIM}am i on the latest?${RESET}"
 row_reveal "  ${MAGENTA}npx agentize uninstall${RESET}      ${DIM}clean removal${RESET}"
+if openclaw_present; then
+  row_reveal "  ${MAGENTA}npx agentize openclaw-check${RESET} ${DIM}report openclaw agents' integration drift${RESET}"
+  row_reveal "  ${MAGENTA}npx agentize from-openclaw${RESET}  ${DIM}seed .agent/ using an agent's identity (run in workspace)${RESET}"
+fi
 
 row_reveal ""
 row_reveal "  ${BOLD}WHERE TO READ${RESET}"
