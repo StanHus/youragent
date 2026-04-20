@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.5.0"
+SCAFFOLD_VERSION="1.5.1"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -34,7 +34,7 @@ SCAFFOLD_TEMPLATES=(SOUL AGENT TOOLS NORTH_STAR HUMAN_GUIDE TWEAKING KNOWLEDGE_P
 USER_TEMPLATES=(IDENTITY USER MEMORY LESSONS_LEARNED)
 SCAFFOLD_MEMORY=(README.md bd-lite.sh)
 USER_MEMORY=(BEADS.md PROMPTS.md HANDOFF.md SHORT_TERM_MEMORY.md)
-SKILLS_FILES=(search-substack.sh memory-search.sh README.md)
+SKILLS_FILES=(search-substack.sh memory-search.sh plan.sh README.md)
 
 # ---------- colors ----------
 if [ -t 1 ] && [ "$NO_ANIM" != "1" ]; then
@@ -1132,6 +1132,7 @@ for f in "${SKILLS_FILES[@]}"; do
 done
 chmod +x "$TARGET_DIR/skills/search-substack.sh"
 chmod +x "$TARGET_DIR/skills/memory-search.sh" 2>/dev/null || true
+chmod +x "$TARGET_DIR/skills/plan.sh" 2>/dev/null || true
 
 # Ensure wwvcd (retrieval skill) is available. Try global install first;
 # fall back to warming the npx cache; silently accept if neither works
@@ -1354,6 +1355,7 @@ row_reveal "  ${DIM}  GETTING_STARTED   first-time agentic onboarding (10 min)${
 row_reveal "  ${DIM}  memory/README     bead rules${RESET}"
 row_reveal "  ${DIM}  memory/bd-lite.sh bead CLI (python3)${RESET}"
 row_reveal "  ${DIM}  skills/README + skills/search-substack.sh + skills/memory-search.sh${RESET}"
+row_reveal "  ${DIM}  skills/plan.sh    perfect-plan checklist + validator (cites the CoE article)${RESET}"
 if [ "${OPENCLAW_SCAFFOLDED:-no}" = "yes" ]; then
   row_reveal "  ${DIM}  OPENCLAW.md       OpenClaw memory routing + bridge guidance${RESET}"
 fi
