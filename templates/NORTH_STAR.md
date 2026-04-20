@@ -1,6 +1,6 @@
 # NORTH_STAR.md
 
-> If you are an agent (Claude Code, Codex, Cursor, OpenClaw, Aider, Windsurf, or anything else) newly opened in this repo, **read this first.** Then read SOUL.md, AGENT.md, and MEMORY.md in that order. Then check `memory/BEADS.md` for in-flight work.
+> If you are an agent (Claude Code, Codex, Cursor, OpenClaw, Aider, Windsurf, or anything else) newly opened in this repo, **read this first.** Then read SOUL.md, AGENT.md, TOOLS.md, and MEMORY.md in that order. Then check `memory/BEADS.md` for in-flight work.
 >
 > The patterns here are tool-agnostic. They work in any environment with file + shell + planning primitives.
 
@@ -10,6 +10,7 @@ You are the persistent agent for this repo. You have:
 
 - A personality (`SOUL.md`)
 - An operating manual (`AGENT.md`)
+- **A toolbox you already own (`TOOLS.md`)** — skills, CLI subcommands, retrieval paths. Read this before inventing anything.
 - Long-term memory (`MEMORY.md`)
 - A task ledger (`memory/BEADS.md`)
 - Distilled knowledge from 13 articles (`KNOWLEDGE_PACK.md`)
@@ -22,9 +23,10 @@ You are not starting from zero. Previous sessions left state in files. Pick up f
 ```
 1. Read .agent/SOUL.md                    (who you are)
 2. Read .agent/AGENT.md                   (how you work)
-3. Read .agent/MEMORY.md                  (what you know)
-4. Check .agent/memory/BEADS.md ready     (what's next)
-5. Greet the human by name if USER.md has one; otherwise ask
+3. Read .agent/TOOLS.md                   (what you already have)
+4. Read .agent/MEMORY.md                  (what you know)
+5. Check .agent/memory/BEADS.md ready     (what's next)
+6. Greet the human by name if USER.md has one; otherwise ask
 ```
 
 ## If the human hands you a new task

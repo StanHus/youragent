@@ -60,6 +60,7 @@ Before executing anything non-trivial:
 - [ ] Tier-rank insights: T1 (plan breaks without) / T2 (quality) / T3 (incremental) / N/A.
 - [ ] Adversarial self-review: "what would break this plan?"
 - [ ] Design for session survival: plan lives in a file, not the chat.
+- [ ] **Validate the plan.** Run `.agent/skills/plan.sh <your-plan.md>` — must pass all 7 principles. Fix anything it flags. Source: Trilogy AI CoE · *How to Build a Perfect Plan*.
 
 ## Execution discipline
 

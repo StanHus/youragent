@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.5.1"
+SCAFFOLD_VERSION="1.5.2"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -874,6 +874,53 @@ if [ "$SUBCOMMAND" = "from-openclaw" ]; then
   cmd_from_openclaw
 fi
 
+cmd_help() {
+  if [ -t 1 ] && [ "${NO_ANIM:-0}" != "1" ]; then
+    BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+    MAGENTA=$'\033[35m'; CYAN=$'\033[36m'
+  else
+    BOLD=""; DIM=""; RESET=""; MAGENTA=""; CYAN=""
+  fi
+  cat <<EOF
+
+  ${BOLD}agentize${RESET}  ${DIM}v${SCAFFOLD_VERSION} · subcommand reference${RESET}
+  ${DIM}────────────────────────────────────────────────────────────${RESET}
+
+  ${BOLD}install / update${RESET}
+    ${MAGENTA}npx agentize${RESET}                 ${DIM}install or safely update the scaffold${RESET}
+    ${MAGENTA}npx agentize plan${RESET}            ${DIM}dry-run preview (writes nothing)${RESET}
+    ${MAGENTA}npx agentize update-check${RESET}    ${DIM}installed vs npm latest${RESET}
+    ${MAGENTA}npx agentize uninstall${RESET}       ${DIM}clean removal (preview + confirm)${RESET}
+
+  ${BOLD}inspect${RESET}
+    ${MAGENTA}npx agentize status${RESET}          ${DIM}single-screen dashboard of agent state${RESET}
+    ${MAGENTA}npx agentize validate${RESET}        ${DIM}scaffold health check (non-zero on breakage)${RESET}
+
+  ${BOLD}openclaw${RESET}  ${DIM}(only available when ~/.openclaw/openclaw.json exists)${RESET}
+    ${MAGENTA}npx agentize configure-openclaw${RESET}  ${DIM}wire global agents to auto-read .agent/${RESET}
+    ${MAGENTA}npx agentize openclaw-check${RESET}      ${DIM}drift report for wired agents${RESET}
+    ${MAGENTA}npx agentize from-openclaw${RESET}       ${DIM}reverse install: seed from agent's identity${RESET}
+
+  ${BOLD}skills${RESET}  ${DIM}(installed at .agent/skills/ — run directly)${RESET}
+    ${CYAN}.agent/skills/plan.sh${RESET}              ${DIM}perfect-plan checklist + validator${RESET}
+    ${CYAN}.agent/skills/memory-search.sh${RESET}     ${DIM}cross-repo + global memory search${RESET}
+    ${CYAN}.agent/skills/search-substack.sh${RESET}   ${DIM}CoE + Stan article search${RESET}
+    ${MAGENTA}npx wwvcd${RESET}                        ${DIM}1,191 findings from Claude Code source${RESET}
+
+  ${BOLD}task ledger${RESET}
+    ${CYAN}.agent/memory/bd-lite.sh${RESET} ${DIM}{ ready | claim <id> | close <id> --reason "..." | block | list }${RESET}
+
+  ${DIM}full agent-facing catalog: .agent/TOOLS.md (after install)${RESET}
+  ${DIM}source: ${RESET}https://github.com/stanhus/youragent
+
+EOF
+  exit 0
+}
+
+if [ "$SUBCOMMAND" = "help" ] || [ "$SUBCOMMAND" = "-h" ] || [ "$SUBCOMMAND" = "--help" ]; then
+  cmd_help
+fi
+
 greet() {
   local target_short="${TARGET_DIR/#$HOME/~}"
   printf "\n"
@@ -1442,6 +1489,7 @@ row_reveal "  ${MAGENTA}npx agentize status${RESET}         ${DIM}what your agen
 row_reveal "  ${MAGENTA}npx agentize validate${RESET}       ${DIM}scaffold health check${RESET}"
 row_reveal "  ${MAGENTA}npx agentize update-check${RESET}   ${DIM}am i on the latest?${RESET}"
 row_reveal "  ${MAGENTA}npx agentize uninstall${RESET}      ${DIM}clean removal${RESET}"
+row_reveal "  ${MAGENTA}npx agentize help${RESET}           ${DIM}full subcommand reference${RESET}"
 if openclaw_present; then
   row_reveal "  ${MAGENTA}npx agentize openclaw-check${RESET} ${DIM}report openclaw agents' integration drift${RESET}"
   row_reveal "  ${MAGENTA}npx agentize from-openclaw${RESET}  ${DIM}seed .agent/ using an agent's identity (run in workspace)${RESET}"

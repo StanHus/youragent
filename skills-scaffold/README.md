@@ -1,26 +1,23 @@
-# skills/README.md
+# skills/
 
-> Invokable helpers for the agent. Shell scripts, not documentation. The agent runs these when the task calls for them.
+> Invokable helpers for the agent. Shell scripts, not documentation.
 
-## Available skills
+**The canonical catalog of skills + tools + subcommands lives in `.agent/TOOLS.md`.** Read that first. This directory just holds the executables.
 
-### `search-substack.sh`
-Search the source publications for articles matching a topic. Returns titles + URLs + attribution.
+## What's here
 
-```bash
-./search-substack.sh "planning"
-./search-substack.sh "memory overwrite"
-./search-substack.sh "openclaw cron"
-```
+- `plan.sh` — perfect-plan checklist + validator ([source article](https://trilogyai.substack.com/p/how-to-build-a-perfect-plan))
+- `memory-search.sh` — cross-repo + global memory search
+- `search-substack.sh` — query CoE + Stan substacks
 
-**Attribution note:** when the agent applies an idea surfaced via this skill, it must cite the source. *"Per 'How to Build a Perfect Plan' (Trilogy AI COE) — ..."*. The human wants to see where ideas come from.
-
-## Rules for the agent
-
-1. **Before inventing, search.** If you're about to design a pattern from scratch, `search-substack.sh <topic>` first. Then `npx wwvcd <topic>` for TS implementation patterns. Only then write new code.
-2. **Always attribute.** Ideas from these sources get cited in your response. Silent lift = fabrication.
-3. **Prefer source over paraphrase.** If the human asks about a topic covered in an article, point them to the URL first, then offer to summarize.
+Run each with no args to see its usage. Full trigger rules + invocation patterns are in `.agent/TOOLS.md`.
 
 ## Adding a new skill
 
-Drop an executable shell/python script here. Document it in this README. Keep skills small and single-purpose.
+1. Drop an executable shell / python script here.
+2. Add an entry to `.agent/TOOLS.md` (the manifest the agent reads on session start).
+3. Keep skills small and single-purpose.
+
+## Rule
+
+Before inventing, check `.agent/TOOLS.md` — you probably already have what you need.
