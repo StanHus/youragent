@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# youragent/install.sh
+# agentize/install.sh
 # Your first agent, done right. By Trilogy AI Center of Excellence.
 # Drops .agent/ into the current repo — personality, memory, bead ledger,
 # 130-pattern knowledge catalog from 14 COE articles.
@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.3.8"
+SCAFFOLD_VERSION="1.4.1"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -237,7 +237,7 @@ def file_contains_scaffold_ref(path):
     try:
         with open(path) as f:
             content = f.read()
-        return any(token in content for token in ("youragent", "NORTH_STAR.md", ".agent/"))
+        return any(token in content for token in ("agentize", "youragent", "NORTH_STAR.md", ".agent/"))
     except FileNotFoundError:
         return False
 
@@ -489,7 +489,7 @@ cmd_configure_openclaw() {
 
   ${BOLD}What is this?${RESET}
     This command configures persistent OpenClaw agents to automatically
-    read .agent/ folders when they enter repositories with youragent.
+    read .agent/ folders when they enter repositories with agentize.
 
   ${BOLD}Install OpenClaw:${RESET}  https://github.com/openclaw/openclaw
 
@@ -518,31 +518,217 @@ if [ "$SUBCOMMAND" = "validate" ]; then
   cmd_validate
 fi
 
-robot_boot() {
-  local target_short="${TARGET_DIR/#$HOME/~}"
-  if [ "$NO_ANIM" = "1" ] || [ ! -t 1 ]; then
-    printf "\n  ${BOLD}AGENTIZE${RESET}  ${DIM}v%s · %s${RESET}\n" "$SCAFFOLD_VERSION" "$target_short"
-    printf "  ${DIM}local only · no background processes${RESET}\n"
-    return
+cmd_uninstall() {
+  # colors for uninstall output (set -e is already active; color block below
+  # mirrors the one further down for interactive UX)
+  if [ -t 1 ] && [ "${NO_ANIM:-0}" != "1" ]; then
+    BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+    RED=$'\033[31m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; CYAN=$'\033[36m'
+  else
+    BOLD=""; DIM=""; RESET=""; RED=""; GREEN=""; YELLOW=""; CYAN=""
   fi
-  printf "\n"
-  printf "      ${CYAN}╭───────╮${RESET}\n"
-  printf "      ${CYAN}│       │${RESET}\n"
-  printf "      ${CYAN}│ ${DIM}─────${RESET}${CYAN} │${RESET}\n"
-  printf "      ${CYAN}╰───────╯${RESET}\n"
-  local slots=("▓────" "─▓───" "──▓──" "───▓─" "────▓" "───▓─" "──▓──")
-  for s in "${slots[@]}"; do
-    printf "\033[2A\r"
-    printf "      ${CYAN}│ ${GREEN}${s}${CYAN} │${RESET}\033[K\n"
-    printf "\033[1B\r"
-    sleep 0.04
+  local agent_dir="$PWD/.agent"
+  local repo_root="$PWD"
+  local marker="$agent_dir/.youragent"
+
+  if [ ! -d "$agent_dir" ] || [ ! -f "$marker" ]; then
+    printf "\n  ${YELLOW}nothing to uninstall${RESET} — no agentize scaffold found at ${BOLD}%s${RESET}\n\n" "$agent_dir"
+    exit 0
+  fi
+
+  # What will be touched?
+  local hook_files=() hook
+  for hook in CLAUDE.md AGENTS.md .cursorrules .windsurfrules; do
+    if [ -f "$repo_root/$hook" ] && grep -qE "agentize|youragent|NORTH_STAR\.md|\.agent/" "$repo_root/$hook" 2>/dev/null; then
+      hook_files+=("$hook")
+    fi
   done
-  printf "\033[2A\r"
-  printf "      ${CYAN}│ ${BOLD}${GREEN}──●──${RESET}${CYAN} │${RESET}\033[K\n"
-  printf "\033[1B\r"
+  local compat_link=""
+  if [ -L "$repo_root/.agents/skills" ] && [ "$(readlink "$repo_root/.agents/skills" 2>/dev/null)" = "../.agent/skills" ]; then
+    compat_link="$repo_root/.agents/skills"
+  fi
+
+  printf "\n  ${BOLD}AGENTIZE · uninstall preview${RESET}\n"
+  printf "  ${DIM}────────────────────────────────────────────────────────${RESET}\n"
+  printf "  ${RED}remove${RESET}  ${BOLD}%s${RESET}  ${DIM}(scaffold — includes your IDENTITY, USER, MEMORY, BEADS, LESSONS_LEARNED)${RESET}\n" ".agent/"
+  for hook in "${hook_files[@]}"; do
+    printf "  ${RED}remove${RESET}  ${BOLD}%s${RESET}  ${DIM}(tool hook that references .agent/)${RESET}\n" "$hook"
+  done
+  if [ -n "$compat_link" ]; then
+    printf "  ${RED}remove${RESET}  ${BOLD}%s${RESET}  ${DIM}(our symlink — only ours, user content untouched)${RESET}\n" ".agents/skills"
+  fi
+  printf "  ${DIM}────────────────────────────────────────────────────────${RESET}\n"
+  printf "  ${YELLOW}personal content in .agent/ will be lost${RESET} ${DIM}(beads, lessons, identity notes)${RESET}\n"
+  printf "  ${DIM}back up ${BOLD}.agent/memory/BEADS.md${RESET}${DIM} and ${BOLD}.agent/LESSONS_LEARNED.md${RESET}${DIM} first if you want to keep them${RESET}\n\n"
+
+  # Confirm (skip with --yes, AGENTIZE_YES=1, or non-TTY)
+  local confirm="no"
+  if [ "${2:-}" = "--yes" ] || [ "${AGENTIZE_YES:-0}" = "1" ]; then
+    confirm="yes"
+  elif [ -t 0 ]; then
+    printf "  ${BOLD}type 'uninstall' to confirm:${RESET} "
+    read -r confirm
+  fi
+  if [ "$confirm" != "uninstall" ] && [ "$confirm" != "yes" ]; then
+    printf "\n  ${YELLOW}cancelled${RESET}  ${DIM}nothing removed${RESET}\n\n"
+    exit 0
+  fi
+
+  # Execute
+  rm -rf "$agent_dir"
+  for hook in "${hook_files[@]}"; do
+    rm -f "$repo_root/$hook"
+  done
+  [ -n "$compat_link" ] && rm -f "$compat_link"
+  # Prune empty .agents/ dir if we created it and nothing else is there
+  [ -d "$repo_root/.agents" ] && rmdir "$repo_root/.agents" 2>/dev/null || true
+
+  printf "\n  ${GREEN}${BOLD}uninstalled${RESET}  ${DIM}→  scaffold, hooks, compat link removed. your repo is yours again.${RESET}\n"
+  printf "  ${DIM}re-run anytime · ${BOLD}npx agentize${RESET}${DIM} · installs fresh${RESET}\n\n"
+  exit 0
+}
+
+if [ "$SUBCOMMAND" = "uninstall" ] || [ "$SUBCOMMAND" = "remove" ]; then
+  cmd_uninstall "$@"
+fi
+
+cmd_plan() {
+  # enable colors for pretty output
+  if [ -t 1 ] && [ "${NO_ANIM:-0}" != "1" ]; then
+    BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+    GREEN=$'\033[32m'; YELLOW=$'\033[33m'; CYAN=$'\033[36m'
+  else
+    BOLD=""; DIM=""; RESET=""; GREEN=""; YELLOW=""; CYAN=""
+  fi
+  local agent_dir="$PWD/.agent"
+  local repo_root="$PWD"
+  local mode="fresh"
+  [ -f "$agent_dir/.youragent" ] && mode="update"
+
+  printf "\n  ${BOLD}AGENTIZE · plan (dry-run)${RESET}  ${DIM}v%s · %s · mode=%s${RESET}\n" "$SCAFFOLD_VERSION" "${agent_dir/#$HOME/~}" "$mode"
+  printf "  ${DIM}────────────────────────────────────────────────────────${RESET}\n"
+  printf "  ${DIM}this is a preview. no files will be written.${RESET}\n\n"
+
+  printf "  ${BOLD}scaffold templates${RESET}  ${DIM}(refreshed every run)${RESET}\n"
+  local t
+  for t in "${SCAFFOLD_TEMPLATES[@]}"; do
+    printf "    ${GREEN}+${RESET} .agent/%s.md\n" "$t"
+  done
+  for t in "${SCAFFOLD_MEMORY[@]}"; do
+    printf "    ${GREEN}+${RESET} .agent/memory/%s\n" "$t"
+  done
+  for t in "${SKILLS_FILES[@]}"; do
+    printf "    ${GREEN}+${RESET} .agent/skills/%s\n" "$t"
+  done
+
+  printf "\n  ${BOLD}personal files${RESET}  ${DIM}(created once · never overwritten)${RESET}\n"
+  for t in "${USER_TEMPLATES[@]}"; do
+    if [ -f "$agent_dir/${t}.md" ]; then
+      printf "    ${DIM}·${RESET} .agent/%s.md  ${DIM}kept (already exists)${RESET}\n" "$t"
+    else
+      printf "    ${GREEN}+${RESET} .agent/%s.md  ${DIM}new${RESET}\n" "$t"
+    fi
+  done
+  for t in "${USER_MEMORY[@]}"; do
+    if [ -f "$agent_dir/memory/${t}" ]; then
+      printf "    ${DIM}·${RESET} .agent/memory/%s  ${DIM}kept (already exists)${RESET}\n" "$t"
+    else
+      printf "    ${GREEN}+${RESET} .agent/memory/%s  ${DIM}new${RESET}\n" "$t"
+    fi
+  done
+
+  printf "\n  ${BOLD}repo-root hook files${RESET}  ${DIM}(so your tool reads .agent/ automatically)${RESET}\n"
+  local hook
+  for hook in CLAUDE.md AGENTS.md .cursorrules .windsurfrules; do
+    if [ -f "$repo_root/$hook" ]; then
+      if grep -qE "agentize|youragent|NORTH_STAR\.md|\.agent/" "$repo_root/$hook" 2>/dev/null; then
+        printf "    ${DIM}·${RESET} %s  ${DIM}already linked — left alone${RESET}\n" "$hook"
+      else
+        printf "    ${YELLOW}!${RESET} %s  ${YELLOW}exists, unlinked${RESET}  ${DIM}you'll get a warning + manual fix suggestion${RESET}\n" "$hook"
+      fi
+    else
+      printf "    ${GREEN}+${RESET} %s  ${DIM}new${RESET}\n" "$hook"
+    fi
+  done
+
+  printf "\n  ${BOLD}cross-harness compat${RESET}\n"
+  if [ -e "$repo_root/.agents/skills" ]; then
+    printf "    ${DIM}·${RESET} .agents/skills  ${DIM}already exists — left alone${RESET}\n"
+  else
+    printf "    ${GREEN}+${RESET} .agents/skills  ${DIM}symlink → ../.agent/skills (codex, opencode, copilot, gemini cli, …)${RESET}\n"
+  fi
+
+  printf "\n  ${BOLD}runtime deps${RESET}  ${DIM}(checked · not installed by us)${RESET}\n"
+  for cmd in python3 npx git; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+      printf "    ${GREEN}✓${RESET} %s\n" "$cmd"
+    else
+      printf "    ${YELLOW}!${RESET} %s  ${DIM}missing — you'll get a heads-up${RESET}\n" "$cmd"
+    fi
+  done
+
+  printf "\n  ${DIM}run${RESET}  ${BOLD}npx agentize${RESET}  ${DIM}to apply this plan.${RESET}\n\n"
+  exit 0
+}
+
+if [ "$SUBCOMMAND" = "plan" ] || [ "$SUBCOMMAND" = "dry-run" ]; then
+  cmd_plan
+fi
+
+# Read installed scaffold version from marker (returns empty if not installed).
+installed_scaffold_version() {
+  local marker="$PWD/.agent/.youragent"
+  [ -f "$marker" ] || return 0
+  awk -F= '/^version=/{print $2; exit}' "$marker"
+}
+
+# Fetch latest npm-published version of agentize (2s timeout, silent on failure).
+fetch_latest_npm_version() {
+  command -v curl >/dev/null 2>&1 || return 0
+  curl -fsSL --max-time 2 https://registry.npmjs.org/agentize/latest 2>/dev/null \
+    | awk -F'"version":"' 'NF>1{split($2,a,"\""); print a[1]; exit}'
+}
+
+cmd_update_check() {
+  if [ -t 1 ] && [ "${NO_ANIM:-0}" != "1" ]; then
+    BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+    GREEN=$'\033[32m'; YELLOW=$'\033[33m'; CYAN=$'\033[36m'
+  else
+    BOLD=""; DIM=""; RESET=""; GREEN=""; YELLOW=""; CYAN=""
+  fi
+  local installed latest
+  installed="$(installed_scaffold_version)"
+  latest="$(fetch_latest_npm_version)"
+
+  if [ -z "$installed" ]; then
+    printf "\n  ${YELLOW}no scaffold installed here${RESET}  ${DIM}run ${BOLD}npx agentize${RESET}${DIM} to install${RESET}\n\n"
+    exit 0
+  fi
+  if [ -z "$latest" ]; then
+    printf "\n  ${DIM}could not reach npm (offline?). installed scaffold: v%s${RESET}\n\n" "$installed"
+    exit 0
+  fi
+  if [ "$installed" = "$latest" ]; then
+    printf "\n  ${GREEN}up to date${RESET}  ${DIM}scaffold v%s · matches npm latest${RESET}\n\n" "$installed"
+    exit 0
+  fi
+  printf "\n  ${YELLOW}${BOLD}update available${RESET}  ${DIM}scaffold v%s → v%s${RESET}\n" "$installed" "$latest"
+  printf "  ${DIM}run${RESET}  ${BOLD}npx agentize${RESET}  ${DIM}to refresh. your personal files stay untouched.${RESET}\n\n"
+  exit 0
+}
+
+if [ "$SUBCOMMAND" = "update-check" ] || [ "$SUBCOMMAND" = "check-updates" ]; then
+  cmd_update_check
+fi
+
+greet() {
+  local target_short="${TARGET_DIR/#$HOME/~}"
   printf "\n"
-  printf "  ${BOLD}AGENTIZE${RESET}  ${DIM}v%s  ·  %s${RESET}\n" "$SCAFFOLD_VERSION" "$target_short"
-  printf "  ${DIM}local only · no background processes${RESET}\n"
+  printf "  ${BOLD}${CYAN}agentize${RESET}  ${DIM}v%s${RESET}\n" "$SCAFFOLD_VERSION"
+  printf "  ${DIM}─────────────────────────────────────────────────────${RESET}\n"
+  printf "  ${BOLD}Hey. Welcome.${RESET}  ${DIM}We're about to drop an agent into this repo.${RESET}\n"
+  printf "  ${DIM}no network chatter · no background processes · reversible with${RESET} ${BOLD}${MAGENTA}npx agentize uninstall${RESET}\n"
+  printf "  ${DIM}target → %s${RESET}\n" "$target_short"
 }
 
 # ---------- live dashboard ----------
@@ -591,7 +777,7 @@ dash_update() {
 }
 
 # ---------- preflight + mode detection ----------
-robot_boot
+greet
 
 INSTALL_MODE="fresh"
 if [ -e "$TARGET_DIR" ]; then
@@ -617,7 +803,14 @@ fi
 
 # Mode-specific intro (one line max)
 case "$INSTALL_MODE" in
-  update) say "${DIM}mode · update · scaffold → v${SCAFFOLD_VERSION}, personal files untouched${RESET}" ;;
+  update)
+    PREV_VERSION="$(installed_scaffold_version)"
+    if [ -n "$PREV_VERSION" ] && [ "$PREV_VERSION" != "$SCAFFOLD_VERSION" ]; then
+      say "${CYAN}↑${RESET} ${DIM}mode · update · scaffold v${PREV_VERSION} → ${BOLD}v${SCAFFOLD_VERSION}${RESET}${DIM}, personal files untouched${RESET}"
+    else
+      say "${DIM}mode · update · scaffold → v${SCAFFOLD_VERSION}, personal files untouched${RESET}"
+    fi
+    ;;
   force)  say "${YELLOW}!${RESET} ${DIM}mode · force · overwriting everything${RESET}" ;;
 esac
 
@@ -784,7 +977,7 @@ hook_install() {
   local hookfile="$1" tool="$2"
   local dest="$REPO_ROOT/$hookfile"
   if [ -e "$dest" ]; then
-    if grep -qE "youragent|NORTH_STAR\.md|\.agent/" "$dest" 2>/dev/null; then
+    if grep -qE "agentize|youragent|NORTH_STAR\.md|\.agent/" "$dest" 2>/dev/null; then
       return  # already linked
     fi
     HOOK_WARN+=("$hookfile exists but doesn't reference .agent/ — add: ‘See .agent/NORTH_STAR.md first.’")
@@ -919,16 +1112,25 @@ else
   row_reveal "  ${CYAN}2${RESET}  ${BOLD}give it a real task${RESET}  ${DIM}— it'll plan, track beads, close with evidence${RESET}"
   row_reveal "  ${DIM}     aider: paste 'Read .agent/NORTH_STAR.md to orient' at session start${RESET}"
   if [ -f "$HOME/.openclaw/openclaw.json" ]; then
-    row_reveal "  ${DIM}     openclaw: run ${BOLD}npx agentize configure-openclaw${RESET}${DIM} to wire all your agents${RESET}"
+    row_reveal "  ${DIM}     openclaw: run ${BOLD}${MAGENTA}npx agentize configure-openclaw${RESET}${DIM} to wire all your agents${RESET}"
   fi
 fi
 
 row_reveal ""
 row_reveal "  ${BOLD}AUTONOMOUS MODE${RESET}  ${DIM}(after 2-3 tasks you trust it)${RESET}"
-row_reveal "  ${DIM}  claude     ${RESET}${BOLD}claude --dangerously-skip-permissions${RESET}"
-row_reveal "  ${DIM}  codex      ${RESET}${BOLD}codex --yolo${RESET}"
-row_reveal "  ${DIM}  aider      ${RESET}${BOLD}aider --yes${RESET}"
+row_reveal "  ${DIM}  claude     ${RESET}${BOLD}${MAGENTA}claude --dangerously-skip-permissions${RESET}"
+row_reveal "  ${DIM}  codex      ${RESET}${BOLD}${MAGENTA}codex --yolo${RESET}"
+row_reveal "  ${DIM}  aider      ${RESET}${BOLD}${MAGENTA}aider --yes${RESET}"
 row_reveal "  ${DIM}  cursor / windsurf    agent mode + auto-approve in settings${RESET}"
+
+row_reveal ""
+row_reveal "  ${BOLD}HANDY COMMANDS${RESET}"
+row_reveal "  ${MAGENTA}npx agentize${RESET}                ${DIM}re-run anytime — safe update${RESET}"
+row_reveal "  ${MAGENTA}npx agentize plan${RESET}           ${DIM}dry-run preview without writing anything${RESET}"
+row_reveal "  ${MAGENTA}npx agentize status${RESET}         ${DIM}what your agent knows right now${RESET}"
+row_reveal "  ${MAGENTA}npx agentize validate${RESET}       ${DIM}scaffold health check${RESET}"
+row_reveal "  ${MAGENTA}npx agentize update-check${RESET}   ${DIM}am i on the latest?${RESET}"
+row_reveal "  ${MAGENTA}npx agentize uninstall${RESET}      ${DIM}clean removal${RESET}"
 
 row_reveal ""
 row_reveal "  ${BOLD}WHERE TO READ${RESET}"

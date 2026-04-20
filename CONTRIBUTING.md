@@ -1,4 +1,4 @@
-# Contributing to youragent
+# Contributing to agentize
 
 ## Publishing
 
@@ -19,7 +19,7 @@ git push && git push --tags
 ## Repo layout
 
 ```
-youragent/
+agentize/
 ├── install.sh              one-liner entry
 ├── package.json            npm metadata
 ├── README.md               user-facing
@@ -62,11 +62,11 @@ cat > /tmp/test-ya/.agent/IDENTITY.md <<'EOF'
 
 ## Name
 
-**Scribe** — maintainer agent for the youragent package itself
+**Scribe** — maintainer agent for the agentize package itself
 
 ## Purpose
 
-This agent exists to keep the youragent scaffold correct, useful, and shippable.
+This agent exists to keep the agentize scaffold correct, useful, and shippable.
 EOF
 
 NO_ANIM=1 bash /path/to/youragent/install.sh status | grep 'Scribe'
@@ -81,7 +81,7 @@ Before merging a PR, review it from the consumer's point of view, not just the r
 - Does the tarball include every new runtime file the feature needs?
 - If a new script or asset is required at runtime, is it present in `package.json` `files`?
 - If a new subcommand is added, did you test it through the packaged entrypoint, not only from a local checkout?
-- If the change affects `npx youragent`, does it still work in non-interactive and non-TTY contexts?
+- If the change affects `npx agentize`, does it still work in non-interactive and non-TTY contexts?
 - If the change modifies files outside the repo or user home config, is it explicitly opt-in and clearly explained?
 - If the change claims to be idempotent, did you test a second run?
 - If the change updates user-facing behavior, is `README.md` accurate and specific about commands, side effects, and rollback?
@@ -95,10 +95,10 @@ npm test
 npm pack
 
 # Inspect what will really ship
-tar -tzf youragent-*.tgz
+tar -tzf agentize-*.tgz
 
 # Package-level execution check
-npx youragent status || true
+npx agentize status || true
 ```
 
 If a PR fails this checklist, don't merge it on vibes. Fix the consumer path first.

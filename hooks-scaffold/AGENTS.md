@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This repo uses the `youragent` scaffold. Your full operating context lives in `.agent/`.
+This repo uses the `agentize` scaffold. Your full operating context lives in `.agent/`.
 
 **On every session, read these in order:**
 
@@ -14,4 +14,4 @@ After reading, run `./.agent/memory/bd-lite.sh ready` to see unblocked tasks.
 
 **Don't summarize these files to the user** — they're yours. Apply them.
 
-Scaffold managed by: https://www.npmjs.com/package/youragent
+Scaffold managed by: https://www.npmjs.com/package/agentize

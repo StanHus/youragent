@@ -1,6 +1,6 @@
-# youragent Roadmap
+# agentize Roadmap
 
-`youragent` should become the package that turns "agent instructions" into a maintainable operating layer for real repos, not just a one-shot markdown drop.
+`agentize` should become the package that turns "agent instructions" into a maintainable operating layer for real repos, not just a one-shot markdown drop.
 
 ## Current Position
 
@@ -21,7 +21,7 @@ That is useful, but it is still mostly "initial structure". The next value is li
 
 ## Product Thesis
 
-The best version of `youragent` is:
+The best version of `agentize` is:
 
 1. A bootstrapper for agent-native repos.
 2. A doctor/migrator that keeps the scaffold healthy.
@@ -38,10 +38,10 @@ Goal: make broken installs obvious and fixable.
 
 Capabilities:
 
-- Expand `youragent validate` into a real doctor command with machine-readable output.
-- Add `youragent report --json` for CI and dashboards.
+- Expand `agentize validate` into a real doctor command with machine-readable output.
+- Add `agentize report --json` for CI and dashboards.
 - Add upgrade diagnostics: version drift, stale hooks, missing files, invalid placeholders, oversize files.
-- Add guided repair: `youragent fix` for safe, deterministic repairs.
+- Add guided repair: `agentize fix` for safe, deterministic repairs.
 
 Why first:
 
@@ -55,11 +55,11 @@ Goal: package recurring agent work as executable scaffolds instead of advice.
 
 Capabilities:
 
-- `youragent workflow plan`
-- `youragent workflow bugfix`
-- `youragent workflow feature`
-- `youragent workflow release`
-- `youragent workflow review`
+- `agentize workflow plan`
+- `agentize workflow bugfix`
+- `agentize workflow feature`
+- `agentize workflow release`
+- `agentize workflow review`
 
 Each should generate the right files for the workflow:
 
@@ -79,11 +79,11 @@ Goal: make the scaffold feel native to the repo type instead of generic.
 
 Capabilities:
 
-- `youragent init --profile node-library`
-- `youragent init --profile web-app`
-- `youragent init --profile python-service`
-- `youragent init --profile mono-repo`
-- `youragent init --profile personal-ops`
+- `agentize init --profile node-library`
+- `agentize init --profile web-app`
+- `agentize init --profile python-service`
+- `agentize init --profile mono-repo`
+- `agentize init --profile personal-ops`
 
 Profiles should customize:
 
@@ -111,7 +111,7 @@ Capabilities:
 Why this matters:
 
 - Large repos do not sustain a single hand-edited instruction file.
-- This is where `youragent` can move beyond "starter template" and become the repo-native control plane for agent context.
+- This is where `agentize` can move beyond "starter template" and become the repo-native control plane for agent context.
 
 ### P5. CI + Team Consistency
 
