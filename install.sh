@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.4.1"
+SCAFFOLD_VERSION="1.4.2"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -964,8 +964,31 @@ for f in "${SKILLS_FILES[@]}"; do
   COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
 chmod +x "$TARGET_DIR/skills/search-substack.sh"
+
+# Ensure wwvcd (retrieval skill) is available. Try global install first;
+# fall back to warming the npx cache; silently accept if neither works
+# (user can still `npx wwvcd` on demand, just with first-run latency).
+WWVCD_STATE="missing"
+if command -v wwvcd >/dev/null 2>&1; then
+  WWVCD_STATE="already-installed"
+elif command -v npm >/dev/null 2>&1; then
+  if npm install -g wwvcd --silent --no-fund --no-audit >/dev/null 2>&1; then
+    WWVCD_STATE="global"
+  elif command -v npx >/dev/null 2>&1; then
+    # No global perms — warm npx cache so first call isn't cold.
+    if npx --yes wwvcd --help >/dev/null 2>&1; then
+      WWVCD_STATE="npx-cached"
+    fi
+  fi
+fi
+
 sleep 0.08
-dash_update "skills" ready "substack retrieval (cited)"
+case "$WWVCD_STATE" in
+  already-installed) dash_update "skills" ready "substack retrieval (cited), wwvcd ready" ;;
+  global)            dash_update "skills" ready "substack retrieval (cited), wwvcd installed globally" ;;
+  npx-cached)        dash_update "skills" ready "substack retrieval (cited), wwvcd via npx (cached)" ;;
+  *)                 dash_update "skills" ready "substack retrieval (cited)" ;;
+esac
 
 # Write marker
 printf "youragent-scaffold\nversion=%s\ninstalled=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MARKER_FILE"
@@ -1092,8 +1115,17 @@ _rt_line() {
   row_reveal "$(printf "  %s  ${BOLD}%-8s${RESET}${DIM}%s${RESET}" "$status" "$cmd" "$desc")"
 }
 _rt_line "python3" "bd-lite (task ledger) runs on this"
-_rt_line "npx"     "wwvcd retrieval skill uses this"
+_rt_line "npx"     "package runner — boots npm-delivered tools on demand"
 _rt_line "git"     "version control + rollback safety"
+# wwvcd: reflect the state we determined during skills install
+case "$WWVCD_STATE" in
+  already-installed|global)
+    row_reveal "  ${GREEN}✓${RESET}  ${BOLD}wwvcd${RESET}    ${DIM}retrieval skill — 1,191 deep findings from Claude Code source${RESET}" ;;
+  npx-cached)
+    row_reveal "  ${GREEN}✓${RESET}  ${BOLD}wwvcd${RESET}    ${DIM}retrieval skill — warmed in npx cache (no global perms)${RESET}" ;;
+  *)
+    row_reveal "  ${YELLOW}!${RESET}  ${BOLD}wwvcd${RESET}    ${DIM}retrieval skill — will fetch on first ${BOLD}${MAGENTA}npx wwvcd${RESET}${DIM} call${RESET}" ;;
+esac
 
 # Surface unlinked-hook warnings here (full detail, below the wiring panel).
 if [ ${#HOOK_WARN[@]} -gt 0 ]; then
