@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.5.2"
+SCAFFOLD_VERSION="1.5.3"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -32,7 +32,7 @@ MARKER_FILE="$TARGET_DIR/.youragent"
 # USER = we initialize once, then never touch (skip-if-exists).
 SCAFFOLD_TEMPLATES=(SOUL AGENT TOOLS NORTH_STAR HUMAN_GUIDE TWEAKING KNOWLEDGE_PACK PATTERNS_CATALOG GOGCLI_STARTER GETTING_STARTED)
 USER_TEMPLATES=(IDENTITY USER MEMORY LESSONS_LEARNED)
-SCAFFOLD_MEMORY=(README.md bd-lite.sh)
+SCAFFOLD_MEMORY=(README.md bd-lite.sh bd-rank.sh)
 USER_MEMORY=(BEADS.md PROMPTS.md HANDOFF.md SHORT_TERM_MEMORY.md)
 SKILLS_FILES=(search-substack.sh memory-search.sh plan.sh README.md)
 
@@ -222,6 +222,7 @@ def required_paths():
         os.path.join("memory", "HANDOFF.md"),
         os.path.join("memory", "SHORT_TERM_MEMORY.md"),
         os.path.join("memory", "bd-lite.sh"),
+        os.path.join("memory", "bd-rank.sh"),
         os.path.join("skills", "search-substack.sh"),
     ]
 
@@ -385,7 +386,7 @@ if mode == "status":
     print()
 
     if open_count > 0:
-        print(f"  {BOLD}Next:{RESET}  ./.agent/memory/bd-lite.sh ready")
+        print(f"  {BOLD}Next:{RESET}  ./.agent/memory/bd-rank.sh ready  {DIM}# ranked by importance + impact{RESET}")
     elif blocked > 0:
         print(f"  {BOLD}Next:{RESET}  Unblock a bead — see ./.agent/memory/BEADS.md")
     elif done == 0:
@@ -908,7 +909,8 @@ cmd_help() {
     ${MAGENTA}npx wwvcd${RESET}                        ${DIM}1,191 findings from Claude Code source${RESET}
 
   ${BOLD}task ledger${RESET}
-    ${CYAN}.agent/memory/bd-lite.sh${RESET} ${DIM}{ ready | claim <id> | close <id> --reason "..." | block | list }${RESET}
+    ${CYAN}.agent/memory/bd-lite.sh${RESET} ${DIM}{ create | claim <id> | close <id> --reason "..." | block | list }${RESET}
+    ${CYAN}.agent/memory/bd-rank.sh${RESET} ${DIM}{ ready | score <id> | stale <id> --reason "..." | boost <id> N }${RESET}
 
   ${DIM}full agent-facing catalog: .agent/TOOLS.md (after install)${RESET}
   ${DIM}source: ${RESET}https://github.com/stanhus/youragent
@@ -1084,6 +1086,7 @@ memory_desc() {
     BEADS.md) echo "memory/BEADS.md (task ledger)" ;;
     README.md) echo "memory/README.md (bead rules)" ;;
     bd-lite.sh) echo "memory/bd-lite.sh (bead CLI)" ;;
+    bd-rank.sh) echo "memory/bd-rank.sh (bead ranker)" ;;
     PROMPTS.md) echo "memory/PROMPTS.md (instruction log)" ;;
     HANDOFF.md) echo "memory/HANDOFF.md (session handoff)" ;;
     SHORT_TERM_MEMORY.md) echo "memory/SHORT_TERM_MEMORY.md (scratch pad)" ;;
@@ -1162,6 +1165,7 @@ for f in "${SCAFFOLD_MEMORY[@]}"; do
   COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
 chmod +x "$TARGET_DIR/memory/bd-lite.sh"
+chmod +x "$TARGET_DIR/memory/bd-rank.sh"
 for f in "${USER_MEMORY[@]}"; do
   if install_file "memory-scaffold/${f}" "$TARGET_DIR/memory/${f}" "1"; then
     COUNT_INSTALLED=$((COUNT_INSTALLED+1))
@@ -1401,6 +1405,7 @@ row_reveal "  ${DIM}  GOGCLI_STARTER    Gmail / Docs / Calendar on-ramp${RESET}"
 row_reveal "  ${DIM}  GETTING_STARTED   first-time agentic onboarding (10 min)${RESET}"
 row_reveal "  ${DIM}  memory/README     bead rules${RESET}"
 row_reveal "  ${DIM}  memory/bd-lite.sh bead CLI (python3)${RESET}"
+row_reveal "  ${DIM}  memory/bd-rank.sh score-based prioritizer (importance + impact + validity)${RESET}"
 row_reveal "  ${DIM}  skills/README + skills/search-substack.sh + skills/memory-search.sh${RESET}"
 row_reveal "  ${DIM}  skills/plan.sh    perfect-plan checklist + validator (cites the CoE article)${RESET}"
 if [ "${OPENCLAW_SCAFFOLDED:-no}" = "yes" ]; then
@@ -1440,7 +1445,7 @@ _rt_line() {
   local status; status=$(_rt_status "$cmd")
   row_reveal "$(printf "  %s  ${BOLD}%-8s${RESET}${DIM}%s${RESET}" "$status" "$cmd" "$desc")"
 }
-_rt_line "python3" "bd-lite (task ledger) runs on this"
+_rt_line "python3" "bd-lite + bd-rank (task ledger + prioritizer) run on this"
 _rt_line "npx"     "package runner — boots npm-delivered tools on demand"
 _rt_line "git"     "version control + rollback safety"
 # wwvcd: reflect the state we determined during skills install

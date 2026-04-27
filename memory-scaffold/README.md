@@ -16,7 +16,8 @@ Two sources shaped this:
 - `PROMPTS.md` — verbatim log of human instructions
 - `HANDOFF.md` — written at end of each session for the next one
 - `BACKUPS/` — rotating backups of memory files (created as needed)
-- `bd-lite.sh` — CLI helper
+- `bd-lite.sh` — CLI helper (create / claim / close / block / list)
+- `bd-rank.sh` — score-based prioritizer (ready / score / stale / unstale / boost)
 
 ## Commands
 
@@ -24,7 +25,6 @@ All run from `.agent/memory/`.
 
 ```bash
 ./bd-lite.sh create "Task subject" --priority P1 --blocked-by B0003
-./bd-lite.sh ready                     # list unblocked pending beads
 ./bd-lite.sh claim B0007               # mark as in_progress, set claimed_by
 ./bd-lite.sh close B0007 --reason "Dev server on :3000, test_login.py passes"
 ./bd-lite.sh block B0007 --reason "BLOCKED: CLIENT_ID missing from .env.example"
@@ -32,13 +32,37 @@ All run from `.agent/memory/`.
 ./bd-lite.sh list --status in_progress
 ```
 
+### Picking what to work on next — `bd-rank.sh`
+
+`bd-lite ready` is FIFO. `bd-rank ready` ranks pending+unblocked beads by
+**importance + impact + validity** so you don't just grab the newest one:
+
+```
+score = priority_weight        (P0=100, P1=50, P2=20)
+      + unblock_fanout * 15    (how many beads this one unblocks)
+      + manual_boost           (sticky override per bead)
+      - stale_penalty          (1000 if marked stale → sinks to bottom)
+```
+
+```bash
+./bd-rank.sh ready                              # ranked next-up list
+./bd-rank.sh score B0007                        # full breakdown for one bead
+./bd-rank.sh stale B0042 --reason "premise gone — superseded by B0050"
+./bd-rank.sh unstale B0042                      # clear the flag
+./bd-rank.sh boost B0007 25                     # surface a low-priority urgent task
+./bd-rank.sh boost B0007 0                      # remove the boost
+```
+
+Markers live in the existing `reason` column (`STALE: ...`, `BOOST=N`) so
+the ledger schema stays compatible with `bd-lite` and with real Beads.
+
 ## Rules (for the agent — non-negotiable)
 
 1. **Never close without a reason.** The `--reason` string is proof of work. "done" is not acceptable.
 2. **Be specific.** Include filenames, ports, counts, test names, screenshots. "fixed bug" is not specific.
 3. **Blocked is valid.** If stuck, `block` the bead with a specific blocker. Don't fake completion.
 4. **Never edit BEADS.md by hand.** Use the CLI. Hand-edits break the append-only discipline.
-5. **Check `ready` before claiming.** Dependencies matter.
+5. **Check `ready` before claiming.** Dependencies matter. Prefer `bd-rank.sh ready` (ranked) over `bd-lite.sh ready` (FIFO).
 6. **One in-progress bead per agent.** Don't claim a second until the first is closed or blocked.
 
 ## Upgrading to real Beads (Steve Yegge's tool)
