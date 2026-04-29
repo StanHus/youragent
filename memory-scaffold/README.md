@@ -44,7 +44,7 @@ All run from `.agent/memory/`.
 ## Upgrading to real Beads (Steve Yegge's tool)
 
 The agentize installer auto-detects real Beads: if `bd` is on PATH when you run
-`npx agentize`, it skips bd-lite and runs `bd init --stealth` instead.
+`npx agentize`, it skips bd-lite and runs `bd init --stealth --skip-agents` instead.
 
 **To install bd:** `brew install beads`
 
@@ -53,7 +53,7 @@ The agentize installer auto-detects real Beads: if `bd` is on PATH when you run
 2. Re-run: `BEADS_MODE=real npx agentize`
 3. Migrate existing beads manually or with a one-shot script:
    ```bash
-   # For each open row in BEADS.md:
+   # For each open row in BEADS.md (real bd uses lowercase p0/p1/p2):
    bd create "<subject>" --priority p1
    ```
 
