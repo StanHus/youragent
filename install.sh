@@ -581,10 +581,10 @@ printf "youragent-scaffold\nversion=%s\ninstalled=%s\n" "$SCAFFOLD_VERSION" "$(d
 
 # ---------- real beads init ----------
 if [ "$BEADS_MODE" = "real" ]; then
-  _REPO_ROOT="${TARGET_DIR%/.agent}"
+  _REPO_ROOT="$(dirname "$TARGET_DIR")"
   if [ ! -d "$_REPO_ROOT/.beads" ]; then
     say "${BOLD}Initializing real Beads${RESET}"
-    (cd "$_REPO_ROOT" && bd init --stealth --skip-agents -q 2>/dev/null) && \
+    (cd "$_REPO_ROOT" && { command -v timeout >/dev/null 2>&1 && timeout 30 bd init --stealth --skip-agents -q || bd init --stealth --skip-agents -q; }) && \
       say "  ${GREEN}✓${RESET} bd initialized — run ${BOLD}bd ready${RESET} to see your task ledger" || \
       say "  ${YELLOW}!${RESET} bd init failed — run ${BOLD}bd init --stealth${RESET} manually in your repo root"
   else
