@@ -26,6 +26,16 @@ TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
 FORCE="${BOOTSTRAP_FORCE:-0}"
 NO_ANIM="${NO_ANIM:-0}"
 MARKER_FILE="$TARGET_DIR/.youragent"
+BEADS_MODE="${BEADS_MODE:-auto}"   # auto | real | lite
+
+# ---------- beads mode resolution ----------
+if [ "$BEADS_MODE" = "auto" ]; then
+  if command -v bd >/dev/null 2>&1; then
+    BEADS_MODE="real"
+  else
+    BEADS_MODE="lite"
+  fi
+fi
 
 # File manifest — split by ownership.
 # SCAFFOLD = we own them, refresh on every install/update.
@@ -387,7 +397,11 @@ case "$INSTALL_MODE" in
     say "  ${CYAN}1.${RESET} Give your agent a ${BOLD}personality${RESET} (SOUL.md) — opinionated, brief, no corporate tone"
     say "  ${CYAN}2.${RESET} Give your agent an ${BOLD}operating manual${RESET} (AGENT.md) — plan-first, evidence-on-close"
     say "  ${CYAN}3.${RESET} Build a ${BOLD}memory system${RESET} (long-term + short-term + handoff)"
-    say "  ${CYAN}4.${RESET} Install a ${BOLD}task ledger${RESET} (bd-lite) — beads with dependency + acceptance"
+    if [ "$BEADS_MODE" = "real" ]; then
+      say "  ${CYAN}4.${RESET} Initialize ${BOLD}real Beads${RESET} (bd detected — Dolt-backed, full history)"
+    else
+      say "  ${CYAN}4.${RESET} Install a ${BOLD}task ledger${RESET} (bd-lite) — beads with dependency + acceptance"
+    fi
     say "  ${CYAN}5.${RESET} Drop a ${BOLD}130-pattern catalog${RESET} from 14 COE articles"
     say "  ${CYAN}6.${RESET} Add ${BOLD}skills${RESET} — substack search with attribution"
     say "  ${CYAN}7.${RESET} ${BOLD}Wire auto-loads${RESET} — CLAUDE.md / AGENTS.md / .cursorrules / .windsurfrules so your tool reads .agent/ automatically"
@@ -514,11 +528,17 @@ for t in "${SCAFFOLD_TEMPLATES[@]}"; do
 done
 
 for f in "${SCAFFOLD_MEMORY[@]}"; do
+  if [ "$f" = "bd-lite.sh" ] && [ "$BEADS_MODE" = "real" ]; then
+    say "  ${DIM}· skipped:${RESET} memory/bd-lite.sh ${DIM}(real Beads active)${RESET}"
+    continue
+  fi
   bar "$(memory_desc "$f")" 8
   fetch_file "memory-scaffold/${f}" "$TARGET_DIR/memory/${f}"
   COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
-chmod +x "$TARGET_DIR/memory/bd-lite.sh"
+if [ "$BEADS_MODE" = "lite" ]; then
+  chmod +x "$TARGET_DIR/memory/bd-lite.sh"
+fi
 
 for f in "${SKILLS_FILES[@]}"; do
   bar "$(skill_desc "$f")" 8
@@ -559,6 +579,19 @@ done
 # Write marker
 printf "youragent-scaffold\nversion=%s\ninstalled=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MARKER_FILE"
 
+# ---------- real beads init ----------
+if [ "$BEADS_MODE" = "real" ]; then
+  _REPO_ROOT="${TARGET_DIR%/.agent}"
+  if [ ! -d "$_REPO_ROOT/.beads" ]; then
+    say "${BOLD}Initializing real Beads${RESET}"
+    (cd "$_REPO_ROOT" && bd init --stealth --skip-agents -q 2>/dev/null) && \
+      say "  ${GREEN}✓${RESET} bd initialized — run ${BOLD}bd ready${RESET} to see your task ledger" || \
+      say "  ${YELLOW}!${RESET} bd init failed — run ${BOLD}bd init --stealth${RESET} manually in your repo root"
+  else
+    say "  ${GREEN}✓${RESET} real Beads already initialized ${DIM}(.beads/ exists)${RESET}"
+  fi
+fi
+
 hr
 
 # ---------- tool auto-wire hooks ----------
@@ -591,10 +624,18 @@ hr
 
 # ---------- runtime dep probes ----------
 say "${BOLD}Runtime checks${RESET}"
-if command -v python3 >/dev/null 2>&1; then
-  say "  ${GREEN}✓${RESET} python3 available — bd-lite ready"
+if [ "$BEADS_MODE" = "real" ]; then
+  BD_VER=$(bd version 2>/dev/null | head -1 || echo "")
+  say "  ${GREEN}✓${RESET} real Beads active — ${BOLD}bd ready${RESET} is your task ledger ${DIM}(${BD_VER})${RESET}"
 else
-  say "  ${RED}!${RESET} ${BOLD}python3 not found${RESET} — bd-lite needs it. Install python3 before using the bead ledger."
+  if command -v python3 >/dev/null 2>&1; then
+    say "  ${GREEN}✓${RESET} python3 available — bd-lite ready"
+  else
+    say "  ${RED}!${RESET} ${BOLD}python3 not found${RESET} — bd-lite needs it. Install python3 before using the bead ledger."
+  fi
+  if command -v bd >/dev/null 2>&1; then
+    say "  ${DIM}· bd detected — upgrade anytime with ${BOLD}BEADS_MODE=real npx agentize${RESET}${DIM}${RESET}"
+  fi
 fi
 
 if command -v npx >/dev/null 2>&1; then
