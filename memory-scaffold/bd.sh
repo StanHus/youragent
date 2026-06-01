@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bd-lite.sh — minimal markdown-file-based bead tracker.
+# bd.sh — minimal markdown-file-based bead tracker.
 # Append-only (except close/block which update a row in place).
 # Ledger: BEADS.md (markdown table).
 
@@ -9,7 +9,7 @@ LEDGER="${BD_LEDGER:-$(dirname "$0")/BEADS.md}"
 
 usage() {
   cat <<EOF
-bd-lite — minimal bead tracker
+bd — minimal bead tracker
 
 Commands:
   create <subject> [--priority P0|P1|P2] [--blocked-by ID]

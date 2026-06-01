@@ -32,7 +32,7 @@ MARKER_FILE="$TARGET_DIR/.youragent"
 # USER = we initialize once, then never touch (skip-if-exists).
 SCAFFOLD_TEMPLATES=(SOUL AGENT TOOLS NORTH_STAR HUMAN_GUIDE TWEAKING KNOWLEDGE_PACK PATTERNS_CATALOG GOGCLI_STARTER GETTING_STARTED)
 USER_TEMPLATES=(IDENTITY USER MEMORY LESSONS_LEARNED)
-SCAFFOLD_MEMORY=(README.md bd-lite.sh bd-rank.sh)
+SCAFFOLD_MEMORY=(README.md bd.sh bd-rank.sh)
 USER_MEMORY=(BEADS.md PROMPTS.md HANDOFF.md SHORT_TERM_MEMORY.md)
 SKILLS_FILES=(search-substack.sh memory-search.sh plan.sh README.md)
 
@@ -221,7 +221,7 @@ def required_paths():
         os.path.join("memory", "PROMPTS.md"),
         os.path.join("memory", "HANDOFF.md"),
         os.path.join("memory", "SHORT_TERM_MEMORY.md"),
-        os.path.join("memory", "bd-lite.sh"),
+        os.path.join("memory", "bd.sh"),
         os.path.join("memory", "bd-rank.sh"),
         os.path.join("skills", "search-substack.sh"),
     ]
@@ -909,7 +909,7 @@ cmd_help() {
     ${MAGENTA}npx wwvcd${RESET}                        ${DIM}1,191 findings from Claude Code source${RESET}
 
   ${BOLD}task ledger${RESET}
-    ${CYAN}.agent/memory/bd-lite.sh${RESET} ${DIM}{ create | claim <id> | close <id> --reason "..." | block | list }${RESET}
+    ${CYAN}.agent/memory/bd.sh${RESET} ${DIM}{ create | claim <id> | close <id> --reason "..." | block | list }${RESET}
     ${CYAN}.agent/memory/bd-rank.sh${RESET} ${DIM}{ ready | score <id> | stale <id> --reason "..." | boost <id> N }${RESET}
 
   ${DIM}full agent-facing catalog: .agent/TOOLS.md (after install)${RESET}
@@ -1085,7 +1085,7 @@ memory_desc() {
   case "$1" in
     BEADS.md) echo "memory/BEADS.md (task ledger)" ;;
     README.md) echo "memory/README.md (bead rules)" ;;
-    bd-lite.sh) echo "memory/bd-lite.sh (bead CLI)" ;;
+    bd.sh) echo "memory/bd.sh (bead CLI)" ;;
     bd-rank.sh) echo "memory/bd-rank.sh (bead ranker)" ;;
     PROMPTS.md) echo "memory/PROMPTS.md (instruction log)" ;;
     HANDOFF.md) echo "memory/HANDOFF.md (session handoff)" ;;
@@ -1160,11 +1160,15 @@ sleep 0.08
 dash_update "scaffold" ready "personality + operating rules + identity"
 
 # memory: scaffold files + user memory
+# Migrate: pre-1.6 installs had bd-lite.sh; remove it (replaced by bd.sh).
+if [ -f "$TARGET_DIR/memory/bd-lite.sh" ]; then
+  rm -f "$TARGET_DIR/memory/bd-lite.sh"
+fi
 for f in "${SCAFFOLD_MEMORY[@]}"; do
   fetch_file "memory-scaffold/${f}" "$TARGET_DIR/memory/${f}"
   COUNT_REFRESHED=$((COUNT_REFRESHED+1))
 done
-chmod +x "$TARGET_DIR/memory/bd-lite.sh"
+chmod +x "$TARGET_DIR/memory/bd.sh"
 chmod +x "$TARGET_DIR/memory/bd-rank.sh"
 for f in "${USER_MEMORY[@]}"; do
   if install_file "memory-scaffold/${f}" "$TARGET_DIR/memory/${f}" "1"; then
@@ -1404,7 +1408,7 @@ row_reveal "  ${DIM}  PATTERNS_CATALOG  130 patterns inherited from 14 Trilogy A
 row_reveal "  ${DIM}  GOGCLI_STARTER    Gmail / Docs / Calendar on-ramp${RESET}"
 row_reveal "  ${DIM}  GETTING_STARTED   first-time agentic onboarding (10 min)${RESET}"
 row_reveal "  ${DIM}  memory/README     bead rules${RESET}"
-row_reveal "  ${DIM}  memory/bd-lite.sh bead CLI (python3)${RESET}"
+row_reveal "  ${DIM}  memory/bd.sh bead CLI (python3)${RESET}"
 row_reveal "  ${DIM}  memory/bd-rank.sh score-based prioritizer (importance + impact + validity)${RESET}"
 row_reveal "  ${DIM}  skills/README + skills/search-substack.sh + skills/memory-search.sh${RESET}"
 row_reveal "  ${DIM}  skills/plan.sh    perfect-plan checklist + validator (cites the CoE article)${RESET}"
@@ -1445,7 +1449,7 @@ _rt_line() {
   local status; status=$(_rt_status "$cmd")
   row_reveal "$(printf "  %s  ${BOLD}%-8s${RESET}${DIM}%s${RESET}" "$status" "$cmd" "$desc")"
 }
-_rt_line "python3" "bd-lite + bd-rank (task ledger + prioritizer) run on this"
+_rt_line "python3" "bd + bd-rank (task ledger + prioritizer) run on this"
 _rt_line "npx"     "package runner — boots npm-delivered tools on demand"
 _rt_line "git"     "version control + rollback safety"
 # wwvcd: reflect the state we determined during skills install

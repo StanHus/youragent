@@ -1,6 +1,6 @@
 # BEADS.md — Task ledger
 
-> The agent's bead graph. Append-only. Every task has an ID, priority, status, and close-reason (evidence). Markdown-based beads (bd-lite). Compatible with real Beads when you upgrade.
+> The agent's bead graph. Append-only. Every task has an ID, priority, status, and close-reason (evidence). Markdown-based beads (bd). Compatible with real Beads when you upgrade.
 >
 > **This file ships pre-seeded with pattern-absorption beads.** Each references a pattern ID in `PATTERNS_CATALOG.md`. The agent works through them as it matures in this repo — reading the source, applying the pattern, closing the bead with evidence of application.
 
@@ -53,13 +53,14 @@ P0 > P1 > P2. P0 = foundational, must happen first. P1 = core methodology. P2 = 
 From `.agent/memory/`:
 
 ```bash
-./bd-lite.sh ready                                    # see unblocked work
-./bd-lite.sh claim B0001                              # take one
+./bd-rank.sh ready                               # ALWAYS prefer — ranked by importance + impact + validity
+./bd.sh ready                                    # FIFO fallback only
+./bd.sh claim B0001                              # take one
 # ... do the work ...
-./bd-lite.sh close B0001 --reason "<what + where>"    # cite specifics
+./bd.sh close B0001 --reason "<what + where>"    # cite specifics
 
-./bd-lite.sh block B0008 --reason "BLOCKED: PATTERNS_CATALOG.md unreadable"
-./bd-lite.sh list --status pending
+./bd.sh block B0008 --reason "BLOCKED: PATTERNS_CATALOG.md unreadable"
+./bd.sh list --status pending
 ```
 
 **`close "done"` is rejected** — you need filenames, ports, counts, test names, commit hashes, screenshot paths. That's the discipline. It's what stops agents from silently skipping steps.
@@ -69,11 +70,11 @@ From `.agent/memory/`:
 For new pattern-absorption work not pre-seeded:
 
 ```bash
-./bd-lite.sh create "Absorb P-XXX-NN: <pattern name>" --priority P2
+./bd.sh create "Absorb P-XXX-NN: <pattern name>" --priority P2
 ```
 
 For real work the human gives you:
 
 ```bash
-./bd-lite.sh create "<imperative task description>" --priority P1
+./bd.sh create "<imperative task description>" --priority P1
 ```

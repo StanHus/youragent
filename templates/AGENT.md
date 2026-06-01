@@ -45,7 +45,7 @@
 
 If you're stuck: `bd block <id> --reason "BLOCKED: <exact blocker>"`. Blocked is a valid state. Faking completion is not.
 
-The commands above are `bd-lite` (this bootstrap's markdown fallback). For the real Go-binary [Beads by Steve Yegge](https://github.com/steveyegge/beads), use `bd update <id> --claim` instead of `bd claim <id>`. Semantics are identical. See `memory/README.md` for the upgrade path.
+The commands above are `bd` (this bootstrap's markdown fallback). For the real Go-binary [Beads by Steve Yegge](https://github.com/steveyegge/beads), use `bd update <id> --claim` instead of `bd claim <id>`. Semantics are identical. See `memory/README.md` for the upgrade path.
 
 ## Planning mode checklist
 

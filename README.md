@@ -89,7 +89,7 @@ npx youragent
 │   ├── GETTING_STARTED.md         # 10-min onboarding
 │   ├── memory/
 │   │   ├── BEADS.md               # task ledger (yours)
-│   │   ├── bd-lite.sh             # bead CLI (python3)
+│   │   ├── bd.sh             # bead CLI (python3)
 │   │   ├── HANDOFF.md             # session handoff notes (yours)
 │   │   ├── PROMPTS.md             # instruction log (yours)
 │   │   ├── SHORT_TERM_MEMORY.md   # scratch pad (yours)
@@ -239,7 +239,7 @@ See [ROADMAP.md](./ROADMAP.md).
 ## Credits
 
 - **Methodology + articles** — [Trilogy AI Center of Excellence](https://trilogyai.substack.com/)
-- **Beads (the real tool)** — [Steve Yegge](https://github.com/steveyegge/beads). This bootstrap's `bd-lite.sh` is a markdown fallback that mimics his semantics.
+- **Beads (the real tool)** — [Steve Yegge](https://github.com/steveyegge/beads). This bootstrap's `bd.sh` is a markdown fallback that mimics his semantics.
 - **WWVCD + packaging** — [Stan Huseletov](https://huseletov.substack.com/)
 - **OpenClaw auto-configuration** — [David Proctor](https://github.com/dp-pcs)
 

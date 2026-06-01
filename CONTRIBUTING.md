@@ -44,14 +44,14 @@ find .agent -type f | wc -l    # expect 21
 NO_ANIM=1 bash /path/to/youragent/install.sh validate
 ```
 
-bd-lite sanity check:
+bd sanity check:
 
 ```bash
 cd /tmp/test-ya/.agent/memory
-./bd-lite.sh ready
-./bd-lite.sh close B0001 --reason "done"   # should FAIL (vague reason)
-./bd-lite.sh claim B0001
-./bd-lite.sh close B0001 --reason "Smoke test: verified CLI rejects vague close reasons"
+./bd.sh ready
+./bd.sh close B0001 --reason "done"   # should FAIL (vague reason)
+./bd.sh claim B0001
+./bd.sh close B0001 --reason "Smoke test: verified CLI rejects vague close reasons"
 ```
 
 Status extraction sanity check:

@@ -23,7 +23,7 @@ This repo now has an agent. Not a chat session — an **agent** with persistent 
     ├── README.md        how beads work
     ├── PROMPTS.md       verbatim log of your instructions
     ├── HANDOFF.md       written at end of each session for the next one
-    └── bd-lite.sh       CLI helpers: ready, claim, close, block
+    └── bd.sh       CLI helpers: ready, claim, close, block
 ```
 
 ## How to use it

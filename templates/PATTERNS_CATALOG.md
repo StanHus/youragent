@@ -50,7 +50,7 @@ Pattern IDs: `P-<ARTICLE>-<NN>`. First section prefix = article:
 
 ## How to Fix Your AI Agents Skipping Steps · [source](https://trilogyai.substack.com/p/how-to-fix-your-ai-agents-keep-cutting)
 
-*Note: the "Beads" tool cited throughout this article is [Steve Yegge's Beads](https://github.com/steveyegge/beads) — a Go CLI built on Dolt. This bootstrap's `bd-lite.sh` is a markdown-file fallback that preserves Yegge's claim-execute-close-with-evidence semantics.*
+*Note: the "Beads" tool cited throughout this article is [Steve Yegge's Beads](https://github.com/steveyegge/beads) — a Go CLI built on Dolt. This bootstrap's `bd.sh` is a markdown-file fallback that preserves Yegge's claim-execute-close-with-evidence semantics.*
 
 
 - **P-CUT-01** — Internalize: LLMs predict completions, they don't execute checklists. Solution is architectural, not prompting.

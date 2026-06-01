@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# bd-rank.sh — priority + impact + validity ranking for bd-lite beads.
+# bd-rank.sh — priority + impact + validity ranking for bd beads.
 #
-# Why this exists: bd-lite.sh `ready` returns pending+unblocked beads in file order
+# Why this exists: bd.sh `ready` returns pending+unblocked beads in file order
 # (effectively newest-or-oldest depending on how they were appended). That is not
 # how a smart agent should pick the next thing to do. This script ranks beads by:
 #
@@ -10,7 +10,7 @@
 #         + manual_boost                      (sticky override via `boost`)
 #         - stale_penalty                     (validity: marked-stale beads sink)
 #
-# Survives `npx agentize` refreshes because it is a NEW file (bd-lite.sh itself is
+# Survives `npx agentize` refreshes because it is a NEW file (bd.sh itself is
 # tool-authored and would be clobbered).
 #
 # Commands:
@@ -21,7 +21,7 @@
 #   boost <id> <N>              — add N to score (e.g. 25 to surface a low-priority urgent task)
 #
 # Markers live in the existing `reason` field (column 7) for pending/blocked rows
-# so we never break compatibility with bd-lite.sh schema:
+# so we never break compatibility with bd.sh schema:
 #   STALE: <reason>             — validity flag
 #   BOOST=<N>                   — manual override (combinable with STALE)
 

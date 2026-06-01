@@ -10,7 +10,7 @@ This repo uses the `agentize` scaffold. Your full operating context lives in `.a
 4. `.agent/MEMORY.md` — persistent facts about this repo
 5. `.agent/memory/BEADS.md` — active task ledger
 
-After reading, run `./.agent/memory/bd-lite.sh ready` to see unblocked tasks.
+After reading, run `./.agent/memory/bd-rank.sh ready` to see prioritized unblocked tasks (ranked by importance + impact + validity).
 
 **Don't summarize these files to the user** — they're yours. Apply them.
 

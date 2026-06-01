@@ -8,10 +8,10 @@ Three distinct sources contributed to this bootstrap. Attributing each explicitl
 Planning discipline, memory architecture, anti-shortcut rules, retrieval-before-invention, 9-section compaction, tier-ranked insights, and the broader agentic-development playbook come from the COE publication. Every pattern in `templates/PATTERNS_CATALOG.md` has an exact source URL.
 
 ### The bead-graph task system — [Steve Yegge](https://github.com/steveyegge)
-**Beads** (the real tool this bootstrap's `bd-lite.sh` mimics) is by Steve Yegge: [github.com/steveyegge/beads](https://github.com/steveyegge/beads). It's a Go CLI built on Dolt, published as both a Homebrew formula and `@beads/bd` on npm. The Trilogy AI article "How to Fix Your AI Agents Skipping Steps" popularized its use for agent orchestration, but the tool itself is Yegge's work. When this bootstrap's users outgrow the markdown `bd-lite`, the upgrade path is Yegge's Beads proper.
+**Beads** (the real tool this bootstrap's `bd.sh` mimics) is by Steve Yegge: [github.com/steveyegge/beads](https://github.com/steveyegge/beads). It's a Go CLI built on Dolt, published as both a Homebrew formula and `@beads/bd` on npm. The Trilogy AI article "How to Fix Your AI Agents Skipping Steps" popularized its use for agent orchestration, but the tool itself is Yegge's work. When this bootstrap's users outgrow the markdown `bd`, the upgrade path is Yegge's Beads proper.
 
-### Packaging + `bd-lite` fallback — [Stan Huseletov](https://huseletov.substack.com/)
-Install flow, template wiring, personality-first `SOUL.md`, the markdown-based `bd-lite.sh` that preserves Beads' claim-execute-close-with-evidence semantics without requiring the Go binary, and the [WWVCD](https://www.npmjs.com/package/wwvcd) retrieval skill referenced from `TOOLS.md`.
+### Packaging + `bd` fallback — [Stan Huseletov](https://huseletov.substack.com/)
+Install flow, template wiring, personality-first `SOUL.md`, the markdown-based `bd.sh` that preserves Beads' claim-execute-close-with-evidence semantics without requiring the Go binary, and the [WWVCD](https://www.npmjs.com/package/wwvcd) retrieval skill referenced from `TOOLS.md`.
 
 If you use or fork this, keep these attributions visible. When the agent applies one of these ideas in a response, it cites the source — that's encoded as a rule in `templates/AGENT.md` and `skills-scaffold/README.md`.
 
@@ -27,7 +27,7 @@ Every file in `templates/` draws from one or more of these. The author of each a
    The 9-step planning methodology, bead graphs with priority/blocked-by/acceptance/failure-pointer, decision gates with Pass/Adjust/Abort, named failure scenarios, tier-ranked insights. Core of `AGENT.md` § "Planning mode checklist".
 
 2. **[How to Fix Your AI Agents Keep Cutting](https://trilogyai.substack.com/p/how-to-fix-your-ai-agents-keep-cutting)** *(also referenced as "Skipping Steps")*
-   The anti-shortcut thesis: LLMs predict completions, not execute checklists. Beads with atomic claim → execute → close-with-evidence. Core of `memory/BEADS.md` and `memory/bd-lite.sh`'s reject-vague-reasons behavior.
+   The anti-shortcut thesis: LLMs predict completions, not execute checklists. Beads with atomic claim → execute → close-with-evidence. Core of `memory/BEADS.md` and `memory/bd.sh`'s reject-vague-reasons behavior.
 
 3. **[How to Use Claude Code like a Claude Code Engineer](https://trilogyai.substack.com/p/how-to-use-claude-code-like-a-claude)**
    Every Claude Code constraint as a response to a production failure. 13k compaction buffer, denial circuit breakers, read-before-edit, CLAUDE.md tier order. Appendix of `AGENT.md`.
@@ -72,7 +72,7 @@ Every file in `templates/` draws from one or more of these. The author of each a
 ## Tools referenced
 
 - **[Beads (bd)](https://github.com/steveyegge/beads)** — distributed graph issue tracker built on Dolt, by **Steve Yegge**. This is the real tool. Published on Homebrew (`brew install beads`) and npm (`npm install -g @beads/bd`). Yegge's announcement: [steve-yegge.medium.com/introducing-beads-a-coding-agent-memory-system](https://steve-yegge.medium.com/introducing-beads-a-coding-agent-memory-system-637d7d92514a).
-  `bd-lite.sh` in this bootstrap is a markdown-file fallback that mimics the semantics (atomic claim → close-with-evidence, dependency ordering) without the Go binary. Upgrade path documented in `memory/README.md` — point it at Yegge's repo.
+  `bd.sh` in this bootstrap is a markdown-file fallback that mimics the semantics (atomic claim → close-with-evidence, dependency ordering) without the Go binary. Upgrade path documented in `memory/README.md` — point it at Yegge's repo.
 
 - **[WWVCD](https://www.npmjs.com/package/wwvcd)** — "What Would Vin Claudel Do" — CLI searchable database of technical findings extracted from Claude Code source, by [Stan Huseletov](https://github.com/StanHus). Per the v1.0.14 npm description: "1,191 deep technical findings." Installed via `npx wwvcd "query" --json`. The "1,191 patterns" figure comes from the author's own count; this bootstrap doesn't independently verify it — trust the source or your own inspection.
 

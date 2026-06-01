@@ -14,7 +14,8 @@
 | Look up past decisions / memory across repos | **`.agent/skills/memory-search.sh "<query>"`** |
 | Source-cited retrieval from CoE articles | **`.agent/skills/search-substack.sh "<topic>"`** |
 | Exact implementation patterns from Claude Code source | **`npx wwvcd "<topic>" --json`** |
-| Manage tasks with evidence-on-close | **`.agent/memory/bd-lite.sh ready | claim | close`** |
+| Pick the next task (always ranked, not FIFO) | **`.agent/memory/bd-rank.sh ready`** |
+| Manage tasks with evidence-on-close | **`.agent/memory/bd.sh claim | close`** |
 | Check your scaffold health | **`npx agentize validate`** |
 | See your current agent state | **`npx agentize status`** |
 | Dry-run preview before re-installing | **`npx agentize plan`** |
@@ -96,16 +97,17 @@ npx wwvcd "judge hallucination evidence field" --json
 
 ---
 
-## Task ledger — `.agent/memory/bd-lite.sh`
+## Task ledger — `.agent/memory/bd.sh`
 
 Bead graph CLI (this bootstrap's markdown fallback; see `.agent/memory/README.md` for upgrading to [real Beads](https://github.com/steveyegge/beads)).
 
 ```bash
-.agent/memory/bd-lite.sh ready                          # unblocked beads
-.agent/memory/bd-lite.sh claim <id>                     # take one
-.agent/memory/bd-lite.sh close <id> --reason "<specifics>"
-.agent/memory/bd-lite.sh block <id> --reason "<blocker>"
-.agent/memory/bd-lite.sh list                           # all beads
+.agent/memory/bd-rank.sh ready                     # ALWAYS prefer this — ranked by importance + impact + validity
+.agent/memory/bd.sh ready                          # FIFO fallback (only if bd-rank is broken)
+.agent/memory/bd.sh claim <id>                     # take one
+.agent/memory/bd.sh close <id> --reason "<specifics>"
+.agent/memory/bd.sh block <id> --reason "<blocker>"
+.agent/memory/bd.sh list                           # all beads
 ```
 
 **Closing a bead requires evidence.** Acceptable: filenames, test names, port numbers, hash of a commit, counts. Not acceptable: "done", "looks good".
@@ -152,7 +154,7 @@ Any MCP server works in this repo by default — nothing in `.agent/` assumes a 
 ## Recommended (human installs when ready)
 
 - **[GOG CLI](https://gogcli.sh/)** — Google Workspace access (Gmail, Docs, Sheets, Calendar). See `GOGCLI_STARTER.md` for setup. Required for email-driven agent loops.
-- **[Beads](https://github.com/steveyegge/beads) by Steve Yegge** — the real distributed graph issue tracker on Dolt. Replaces `bd-lite` when you want multi-agent coordination, git-based sync, or a database-backed ledger. Install: `brew install beads` or `npm install -g @beads/bd`.
+- **[Beads](https://github.com/steveyegge/beads) by Steve Yegge** — the real distributed graph issue tracker on Dolt. Replaces `bd` when you want multi-agent coordination, git-based sync, or a database-backed ledger. Install: `brew install beads` or `npm install -g @beads/bd`.
 
 ---
 
@@ -162,7 +164,7 @@ The agent should verify on first session:
 
 1. `git --version` → if missing, warn the human.
 2. `npx wwvcd --help` → if fails, note "WWVCD unavailable; retrieval fallback = grep + read" in `LESSONS_LEARNED.md`.
-3. `.agent/memory/bd-lite.sh ready` → if not executable, `chmod +x` it.
+3. `.agent/memory/bd-rank.sh ready` → if not executable, `chmod +x` both `bd.sh` and `bd-rank.sh`.
 4. `.agent/skills/plan.sh` (no args) → confirms the plan checklist is installed and current.
 
 If any tool goes missing mid-project, flag in `LESSONS_LEARNED.md`.

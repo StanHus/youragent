@@ -106,7 +106,7 @@ for the exact schema. Core rules:
 - Every bead has an **acceptance block** — files changed, tests passing, or
   command output that proves it's done.
 - You **cannot close** a bead by writing "done". Cite the evidence inline.
-- Use \`./.agent/memory/bd-lite.sh ready\` to see unblocked beads.
+- Use \`./.agent/memory/bd-rank.sh ready\` to see prioritized beads (ranked, not FIFO).
 - Dependencies are declared with \`blocked_by:\` and are enforced.
 - Create a new bead instead of quietly expanding an existing one.
 
@@ -136,7 +136,7 @@ The \`.agent/\` scaffold is maintained by the agentize package
 \`SOUL.md\`, \`AGENT.md\`, \`NORTH_STAR.md\`, \`PATTERNS_CATALOG.md\`,
 \`HUMAN_GUIDE.md\`, \`TWEAKING.md\`, \`KNOWLEDGE_PACK.md\`,
 \`GOGCLI_STARTER.md\`, \`GETTING_STARTED.md\`, \`OPENCLAW.md\`,
-\`memory/bd-lite.sh\`, \`memory/README.md\`, \`skills/README.md\`,
+\`memory/bd.sh\`, \`memory/README.md\`, \`skills/README.md\`,
 \`skills/search-substack.sh\`.
 
 Files you WRITE to (personal, never overwritten):
