@@ -15,9 +15,11 @@ Two sources shaped this:
 - `BEADS.md` — the ledger (human-readable + grep-friendly)
 - `PROMPTS.md` — verbatim log of human instructions
 - `HANDOFF.md` — written at end of each session for the next one
+- `SHORT_TERM_MEMORY.md` — session-local scratch (cleared per session)
 - `BACKUPS/` — rotating backups of memory files (created as needed)
 - `bd.sh` — CLI helper (create / claim / close / block / list)
 - `bd-rank.sh` — score-based prioritizer (ready / score / stale / unstale / boost)
+- `instincts/` — **(v2.0)** reflex patterns (one markdown per reflex; agent reads them on session start)
 
 ## Commands
 

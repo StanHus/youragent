@@ -26,6 +26,64 @@ Just tell the agent. Say: "From now on, always ask before modifying files in /ve
 ### To wipe and start over
 Delete `.agent/` and re-run the bootstrap. Your git history is untouched.
 
+### To scale strictness (v2.0)
+Set `AGENTIZE_PROFILE` before running `npx agentize`:
+
+- `AGENTIZE_PROFILE=minimal npx agentize` — only load-bearing instincts/hooks (least context, least friction; for when you want the agent unburdened)
+- `AGENTIZE_PROFILE=standard npx agentize` — default; most instincts active
+- `AGENTIZE_PROFILE=strict npx agentize` — every guard on (verify mandatory on close, FIFO `bd ready` refused, vague reasons rejected pre-flight). For mission-critical agents.
+
+The profile is written to `.agent/.youragent` and read by `agentize audit`. You can change it any time by re-running install with a different value.
+
+### To add a reflex (instinct)
+Drop a markdown file in `.agent/memory/instincts/`:
+
+```markdown
+---
+id: my-instinct
+trigger: one-line condition that fires this reflex
+profile: standard
+---
+
+## Action
+What you do without thinking.
+
+## Evidence
+How you know you applied it.
+
+## Why
+The one-line reason.
+```
+
+The agent reads `.agent/memory/instincts/` on session start. Keep each file under 30 lines — instincts are reflexes, not essays. If it needs more, put it in `PATTERNS_CATALOG.md`.
+
+To auto-propose instincts from your session memory:
+
+```bash
+./.agent/skills/learn.sh           # see proposals
+./.agent/skills/learn.sh --apply   # write proposals as drafts in memory/instincts/proposed/
+```
+
+### To verify an agent's "done" actually means done
+```bash
+./.agent/skills/verify.sh <bead-id>   # check one bead's close-reason
+./.agent/skills/verify.sh --last      # check the most recently closed
+./.agent/skills/verify.sh --all       # check every closed bead
+```
+Cited filenames must exist. Cited tests/ports/hashes are flagged for human eye.
+
+### To get a "how alive is this agent" score
+```bash
+npx agentize audit
+```
+Returns 0-100 across 8 dimensions (identity filled, lessons logged, instincts present, bead close rate, recency, profile, skills). 80+ = alive; 50-80 = breathing; under 50 = stale.
+
+### To hand off a session
+```bash
+npx agentize status --markdown > HANDOFF.md
+```
+Generates a portable markdown doc with identity, active beads, instincts, recent lessons, and resume instructions. Paste into a PR description or a Slack message.
+
 ## For the agent (rules for self-modification)
 
 You are allowed to edit your own files. Follow these rules.

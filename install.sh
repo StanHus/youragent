@@ -19,13 +19,23 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="1.5.3"
+SCAFFOLD_VERSION="2.0.0"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
 FORCE="${BOOTSTRAP_FORCE:-0}"
 NO_ANIM="${NO_ANIM:-0}"
 MARKER_FILE="$TARGET_DIR/.youragent"
+
+# v2.0: hook profile scales scaffold strictness without editing files.
+# minimal  = only load-bearing instincts/hooks (least context, least friction)
+# standard = default
+# strict   = every guard on (verify required, no FIFO bd ready, no vague closes)
+AGENTIZE_PROFILE="${AGENTIZE_PROFILE:-standard}"
+case "$AGENTIZE_PROFILE" in
+  minimal|standard|strict) ;;
+  *) AGENTIZE_PROFILE="standard" ;;
+esac
 
 # File manifest — split by ownership.
 # SCAFFOLD = we own them, refresh on every install/update.
@@ -34,7 +44,9 @@ SCAFFOLD_TEMPLATES=(SOUL AGENT TOOLS NORTH_STAR HUMAN_GUIDE TWEAKING KNOWLEDGE_P
 USER_TEMPLATES=(IDENTITY USER MEMORY LESSONS_LEARNED)
 SCAFFOLD_MEMORY=(README.md bd.sh bd-rank.sh)
 USER_MEMORY=(BEADS.md PROMPTS.md HANDOFF.md SHORT_TERM_MEMORY.md)
-SKILLS_FILES=(search-substack.sh memory-search.sh plan.sh README.md)
+# v2.0: instincts/ — short operational reflexes (trigger/action/evidence)
+SCAFFOLD_INSTINCTS=(README.md bd-rank-first.md evidence-or-die.md retrieve-before-invent.md plan-before-touch.md lessons-on-mistake.md dont-narrate.md)
+SKILLS_FILES=(search-substack.sh memory-search.sh plan.sh verify.sh learn.sh README.md)
 
 # ---------- colors ----------
 if [ -t 1 ] && [ "$NO_ANIM" != "1" ]; then
@@ -425,6 +437,11 @@ PY
 }
 
 cmd_status() {
+  # v2.0: --markdown emits a portable handoff doc instead of the dashboard
+  if [ "${2:-}" = "--markdown" ] || [ "${2:-}" = "-m" ]; then
+    cmd_status_markdown "${3:-}"
+    exit 0
+  fi
   run_agent_audit "status" 0
   exit 0
 }
@@ -434,8 +451,217 @@ cmd_validate() {
   exit $?
 }
 
+# v2.0: liveness audit — score the scaffold 0..100 (different from `validate`,
+# which checks structural correctness). Audit checks signs of life: IDENTITY
+# filled, instincts present, lessons non-empty, bead close rate, recency.
+cmd_audit() {
+  local agent_dir="$PWD/.agent"
+  if [ ! -d "$agent_dir" ] || [ ! -f "$agent_dir/.youragent" ]; then
+    printf "\n  ${DIM}No agent installed here. Run ${BOLD}npx agentize${RESET}${DIM} first.${RESET}\n\n"
+    exit 0
+  fi
+  python3 - "$agent_dir" "$BOLD" "$DIM" "$RESET" "$GREEN" "$YELLOW" "$RED" "$CYAN" <<'PY'
+import sys, os, re
+from datetime import datetime, timezone
+
+agent_dir, BOLD, DIM, RESET, GREEN, YELLOW, RED, CYAN = sys.argv[1:9]
+
+def read(p):
+    try: return open(p).read()
+    except: return ""
+
+def lines_of(p):
+    return [l for l in read(p).splitlines() if l.strip()]
+
+def non_placeholder(p):
+    """Count lines that aren't markdown chrome or fill-me-in markers."""
+    out = 0
+    for line in read(p).splitlines():
+        s = line.strip()
+        if not s: continue
+        if s.startswith(("#", ">", "|", "-", "*")): continue
+        if "_(" in s or "fill me in" in s.lower(): continue
+        out += 1
+    return out
+
+checks = []
+
+# 1. Identity filled (15 pts)
+idn = non_placeholder(os.path.join(agent_dir, "IDENTITY.md"))
+checks.append(("identity",     min(15, idn * 3), 15, f"{idn} non-placeholder lines"))
+
+# 2. Memory non-empty (10 pts)
+mem = non_placeholder(os.path.join(agent_dir, "MEMORY.md"))
+checks.append(("memory",       min(10, mem * 2), 10, f"{mem} lines"))
+
+# 3. Lessons learned (15 pts) — proves the agent learns from mistakes
+les = non_placeholder(os.path.join(agent_dir, "LESSONS_LEARNED.md"))
+checks.append(("lessons",      min(15, les * 3), 15, f"{les} lessons"))
+
+# 4. Instincts present (15 pts)
+idir = os.path.join(agent_dir, "memory", "instincts")
+ic = len([f for f in os.listdir(idir) if f.endswith(".md") and f != "README.md"]) if os.path.isdir(idir) else 0
+checks.append(("instincts",    min(15, ic * 3), 15, f"{ic} reflexes"))
+
+# 5. Bead close rate (20 pts)
+beads = []
+for line in read(os.path.join(agent_dir, "memory", "BEADS.md")).splitlines():
+    m = re.match(r'^\| (B\d{4}) \| (P\d) \| (\w+) \|', line)
+    if m: beads.append(m.group(3))
+total_b = len([b for b in beads if b != "cancelled"])
+done_b = len([b for b in beads if b == "done"])
+rate = (done_b / total_b) if total_b else 0
+checks.append(("close-rate",   int(20 * rate), 20, f"{done_b}/{total_b} closed ({int(rate*100)}%)"))
+
+# 6. Recency (10 pts) — marker timestamp
+marker = read(os.path.join(agent_dir, ".youragent"))
+m = re.search(r'installed=(\S+)', marker)
+recency = 0
+detail = "no marker"
+if m:
+    try:
+        ts = datetime.fromisoformat(m.group(1).replace("Z","+00:00"))
+        age_days = (datetime.now(timezone.utc) - ts).days
+        recency = max(0, 10 - age_days // 7)   # full marks within 1 week, decay weekly
+        detail = f"{age_days}d old"
+    except: pass
+checks.append(("recency",      recency, 10, detail))
+
+# 7. Hook profile present (5 pts) — proves v2.0+ scaffold
+profile = ""
+m = re.search(r'profile=(\w+)', marker)
+if m: profile = m.group(1)
+checks.append(("profile",      5 if profile else 0, 5, profile or "(v1, no profile)"))
+
+# 8. Active skills (10 pts)
+sdir = os.path.join(agent_dir, "skills")
+shs = [f for f in os.listdir(sdir) if f.endswith(".sh")] if os.path.isdir(sdir) else []
+checks.append(("skills",       min(10, len(shs) * 2), 10, f"{len(shs)} active"))
+
+total = sum(s for _, s, _, _ in checks)
+total_max = sum(m for _, _, m, _ in checks)
+pct = int(100 * total / total_max)
+
+verdict_color = GREEN if pct >= 80 else (YELLOW if pct >= 50 else RED)
+verdict = "alive" if pct >= 80 else ("breathing" if pct >= 50 else "stale")
+
+print()
+print(f"  {BOLD}{CYAN}agentize audit{RESET}  {DIM}— is this agent alive?{RESET}")
+print(f"  {DIM}─────────────────────────────────────────────────────────{RESET}")
+for name, score, mx, detail in checks:
+    bar_full = score * 12 // mx
+    bar_empty = 12 - bar_full
+    color = GREEN if score == mx else (YELLOW if score >= mx//2 else RED)
+    print(f"  {DIM}{name:<11}{RESET} {color}{'█' * bar_full}{DIM}{'░' * bar_empty}{RESET}  {score:>2}/{mx:<2}  {DIM}{detail}{RESET}")
+print(f"  {DIM}─────────────────────────────────────────────────────────{RESET}")
+print(f"  {BOLD}liveness  {verdict_color}{pct}/100  {verdict}{RESET}")
+print()
+sys.exit(0 if pct >= 50 else 2)
+PY
+}
+
+# v2.0: status --markdown emits a portable handoff doc
+cmd_status_markdown() {
+  local out="${1:-}"
+  local agent_dir="$PWD/.agent"
+  if [ ! -d "$agent_dir" ] || [ ! -f "$agent_dir/.youragent" ]; then
+    printf "# Handoff\n\n_No agent installed at %s._\n" "$PWD"
+    return 0
+  fi
+  python3 - "$agent_dir" <<'PY' > "${out:-/dev/stdout}"
+import sys, os, re
+from datetime import datetime, timezone
+agent_dir = sys.argv[1]
+
+def read(p):
+    try: return open(p).read()
+    except: return ""
+
+def first_section(p, header):
+    txt = read(p)
+    m = re.search(rf'^##\s+{re.escape(header)}\s*$\n(.*?)(?=^##\s|\Z)', txt, re.M|re.S)
+    return m.group(1).strip() if m else ""
+
+def head_lines(p, n=5):
+    return "\n".join(l for l in read(p).splitlines() if l.strip())[:n*100]
+
+marker = read(os.path.join(agent_dir, ".youragent"))
+mver = re.search(r'version=(\S+)', marker); ver = mver.group(1) if mver else "?"
+mpro = re.search(r'profile=(\w+)', marker); prof = mpro.group(1) if mpro else "(unset)"
+mins = re.search(r'installed=(\S+)', marker); ins = mins.group(1) if mins else "?"
+
+# Identity
+ident = read(os.path.join(agent_dir, "IDENTITY.md"))
+name = "(unset)"
+m = re.search(r'^##\s+Name\s*\n+(.+?)(?=\n##|\Z)', ident, re.M|re.S)
+if m:
+    for line in m.group(1).splitlines():
+        s = re.sub(r'[*_`~]+', '', line).strip()
+        if s and "_(" not in s and "fill me in" not in s.lower():
+            name = s; break
+
+# Beads
+beads_lines = []
+for line in read(os.path.join(agent_dir, "memory", "BEADS.md")).splitlines():
+    m = re.match(r'^\| (B\d{4}) \| (P\d) \| (\w+) \| ([^|]+) \| ([^|]+) \|', line)
+    if m:
+        bid, prio, status, blocked, subj = m.groups()
+        beads_lines.append((bid, prio, status, blocked.strip(), subj.strip()))
+
+pending = [b for b in beads_lines if b[2] == "pending"]
+in_prog = [b for b in beads_lines if b[2] == "in_progress"]
+done    = [b for b in beads_lines if b[2] == "done"]
+
+# Instincts
+idir = os.path.join(agent_dir, "memory", "instincts")
+instincts = sorted([f[:-3] for f in os.listdir(idir) if f.endswith(".md") and f != "README.md"]) if os.path.isdir(idir) else []
+
+# Lessons (last 5)
+les = [l for l in read(os.path.join(agent_dir, "LESSONS_LEARNED.md")).splitlines() if l.strip().startswith("- ")][-5:]
+
+print(f"# Handoff — {name}")
+print()
+print(f"_Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_  ")
+print(f"_Scaffold: agentize v{ver} · profile: `{prof}` · installed {ins}_")
+print()
+print("## Active work")
+print()
+if in_prog:
+    print("**In progress**")
+    for b in in_prog: print(f"- `{b[0]}` {b[1]} — {b[4]}")
+    print()
+print(f"**Pending** ({len(pending)})")
+for b in pending[:10]: print(f"- `{b[0]}` {b[1]} {'(blocked)' if b[3] not in ('—','-','') else ''} — {b[4]}")
+if len(pending) > 10: print(f"- _… {len(pending)-10} more in BEADS.md_")
+print()
+print(f"**Closed** ({len(done)})")
+print()
+print("## Instincts active")
+print()
+for i in instincts: print(f"- `{i}`")
+print()
+print("## Recent lessons")
+print()
+for l in les: print(l)
+if not les: print("_(none yet)_")
+print()
+print("## How to resume")
+print()
+print(f"1. Read `.agent/NORTH_STAR.md`, `.agent/SOUL.md`, `.agent/AGENT.md`")
+print(f"2. Read instincts in `.agent/memory/instincts/`")
+print(f"3. Run `./.agent/memory/bd-rank.sh ready` to see prioritized work")
+print(f"4. Closing a bead requires evidence — run `./.agent/skills/verify.sh <id>` after")
+PY
+  return 0
+}
+
 if [ "$SUBCOMMAND" = "status" ]; then
-  cmd_status
+  cmd_status "$@"
+fi
+
+if [ "$SUBCOMMAND" = "audit" ]; then
+  cmd_audit
+  exit $?
 fi
 
 # ---------- configure-openclaw subcommand ----------
@@ -894,8 +1120,10 @@ cmd_help() {
     ${MAGENTA}npx agentize uninstall${RESET}       ${DIM}clean removal (preview + confirm)${RESET}
 
   ${BOLD}inspect${RESET}
-    ${MAGENTA}npx agentize status${RESET}          ${DIM}single-screen dashboard of agent state${RESET}
-    ${MAGENTA}npx agentize validate${RESET}        ${DIM}scaffold health check (non-zero on breakage)${RESET}
+    ${MAGENTA}npx agentize status${RESET}              ${DIM}single-screen dashboard of agent state${RESET}
+    ${MAGENTA}npx agentize status --markdown${RESET}   ${DIM}portable handoff doc (pipe to file or PR)${RESET}
+    ${MAGENTA}npx agentize validate${RESET}            ${DIM}scaffold health check (non-zero on breakage)${RESET}
+    ${MAGENTA}npx agentize audit${RESET}               ${DIM}liveness score 0-100 (alive · breathing · stale)${RESET}
 
   ${BOLD}openclaw${RESET}  ${DIM}(only available when ~/.openclaw/openclaw.json exists)${RESET}
     ${MAGENTA}npx agentize configure-openclaw${RESET}  ${DIM}wire global agents to auto-read .agent/${RESET}
@@ -904,9 +1132,16 @@ cmd_help() {
 
   ${BOLD}skills${RESET}  ${DIM}(installed at .agent/skills/ — run directly)${RESET}
     ${CYAN}.agent/skills/plan.sh${RESET}              ${DIM}perfect-plan checklist + validator${RESET}
+    ${CYAN}.agent/skills/verify.sh${RESET}            ${DIM}evidence-truth bead close-reasons (anti-bullshit)${RESET}
+    ${CYAN}.agent/skills/learn.sh${RESET}             ${DIM}propose instincts from session memory${RESET}
     ${CYAN}.agent/skills/memory-search.sh${RESET}     ${DIM}cross-repo + global memory search${RESET}
     ${CYAN}.agent/skills/search-substack.sh${RESET}   ${DIM}CoE + Stan article search${RESET}
     ${MAGENTA}npx wwvcd${RESET}                        ${DIM}1,191 findings from Claude Code source${RESET}
+
+  ${BOLD}profile${RESET}  ${DIM}(scale scaffold strictness without editing files)${RESET}
+    ${MAGENTA}AGENTIZE_PROFILE=minimal${RESET}   ${DIM}only load-bearing instincts (least context)${RESET}
+    ${MAGENTA}AGENTIZE_PROFILE=standard${RESET}  ${DIM}default — most instincts active${RESET}
+    ${MAGENTA}AGENTIZE_PROFILE=strict${RESET}    ${DIM}every guard on (verify mandatory, no FIFO)${RESET}
 
   ${BOLD}task ledger${RESET}
     ${CYAN}.agent/memory/bd.sh${RESET} ${DIM}{ create | claim <id> | close <id> --reason "..." | block | list }${RESET}
@@ -926,21 +1161,33 @@ fi
 greet() {
   local target_short="${TARGET_DIR/#$HOME/~}"
   printf "\n"
-  printf "  ${BOLD}${CYAN}agentize${RESET}  ${DIM}v%s${RESET}\n" "$SCAFFOLD_VERSION"
+  printf "  ${BOLD}${CYAN}agentize${RESET}  ${DIM}v%s · profile=%s${RESET}\n" "$SCAFFOLD_VERSION" "$AGENTIZE_PROFILE"
   printf "  ${DIM}─────────────────────────────────────────────────────${RESET}\n"
-  printf "  ${BOLD}Hey. Welcome.${RESET}  ${DIM}We're about to drop an agent into this repo.${RESET}\n"
-  printf "  ${DIM}no network chatter · no background processes · reversible with${RESET} ${BOLD}${MAGENTA}npx agentize uninstall${RESET}\n"
-  printf "  ${DIM}target → %s${RESET}\n" "$target_short"
+  printf "  ${BOLD}Hey. Welcome.${RESET}  ${DIM}Dropping a v2 agent into this repo.${RESET}\n"
+  printf "  ${DIM}beads · instincts · verify · learn · audit · markdown handoff${RESET}\n"
+  printf "  ${DIM}target → %s · reversible with${RESET} ${BOLD}${MAGENTA}npx agentize uninstall${RESET}\n" "$target_short"
 }
 
-# ---------- live dashboard ----------
+# ---------- v2.0: dense matrix dashboard ----------
+# Replaces v1's row-by-row reveal with a single boxed module grid that
+# animates fill bars in place. Same dash_init / dash_add / dash_update API
+# so the rest of install.sh doesn't change.
 DASH_MODULES=()
 DASH_DESCS=()
+DASH_BOX_WIDTH=58
 
 dash_init() {
   printf "\n"
-  printf "  ${BOLD}%-10s  %-40s  %s${RESET}\n" "MODULE" "WHAT" "STATE"
-  printf "  ${DIM}────────────────────────────────────────────────────────────────${RESET}\n"
+  if [ "$NO_ANIM" = "1" ] || [ ! -t 1 ]; then
+    DASH_MODULES=()
+    DASH_DESCS=()
+    return
+  fi
+  # Top of box
+  printf "  ${CYAN}╭"
+  local i=0
+  while [ $i -lt $DASH_BOX_WIDTH ]; do printf "─"; i=$((i+1)); done
+  printf "╮${RESET}\n"
   DASH_MODULES=()
   DASH_DESCS=()
 }
@@ -949,7 +1196,38 @@ dash_add() {
   local mod="$1" what="$2"
   DASH_MODULES+=("$mod")
   DASH_DESCS+=("$what")
-  printf "  ${DIM}%-10s  %-40s  ░░░░  pending${RESET}\n" "$mod" "$what"
+  if [ "$NO_ANIM" = "1" ] || [ ! -t 1 ]; then
+    return
+  fi
+  # Empty row with placeholder bar
+  printf "  ${CYAN}│${RESET} ${DIM}%-10s ░░░░░░░░░░░░  %-30s${RESET} ${CYAN}│${RESET}\n" "$mod" "queued…"
+}
+
+# Animated fill: 12 blocks, paint them L→R in ~120ms.
+_dash_paint_bar() {
+  local mod="$1" desc="$2" color="$3" final_block="$4"
+  local row_idx=-1 i
+  for ((i=0; i<${#DASH_MODULES[@]}; i++)); do
+    if [ "${DASH_MODULES[$i]}" = "$mod" ]; then row_idx=$i; break; fi
+  done
+  [ "$row_idx" -lt 0 ] && return
+  local total=${#DASH_MODULES[@]}
+  local up=$((total - row_idx))
+  # Animate 12 blocks
+  local b
+  for b in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    local empty=$((12 - b))
+    printf "\033[${up}A\r"
+    printf "  ${CYAN}│${RESET} ${BOLD}%-10s${RESET} ${color}" "$mod"
+    local k=0
+    while [ $k -lt $b ]; do printf "${final_block}"; k=$((k+1)); done
+    printf "${RESET}${DIM}"
+    k=0
+    while [ $k -lt $empty ]; do printf "░"; k=$((k+1)); done
+    printf "${RESET}  ${DIM}%-30s${RESET} ${CYAN}│${RESET}\033[K\n" "${desc:0:30}"
+    printf "\033[$((up - 1))B\r" 2>/dev/null || true
+    sleep 0.012
+  done
 }
 
 dash_update() {
@@ -958,24 +1236,28 @@ dash_update() {
     printf "  %-10s  %-40s  %s\n" "$mod" "${detail:-—}" "$state"
     return
   fi
-  local i row_idx=-1
+  local row_idx=-1 i
   for ((i=0; i<${#DASH_MODULES[@]}; i++)); do
     if [ "${DASH_MODULES[$i]}" = "$mod" ]; then row_idx=$i; break; fi
   done
   [ "$row_idx" -lt 0 ] && return
-  local total=${#DASH_MODULES[@]}
-  local up=$((total - row_idx))
   local desc="${DASH_DESCS[$row_idx]}"
   [ -n "$detail" ] && desc="$detail"
-  printf "\033[${up}A\r"
   case "$state" in
-    ready) printf "  ${GREEN}${BOLD}%-10s${RESET}  %-40s  ${GREEN}████  ready${RESET}\033[K\n" "$mod" "$desc" ;;
-    warn)  printf "  ${YELLOW}%-10s${RESET}  %-40s  ${YELLOW}▓▓░░  ${detail}${RESET}\033[K\n" "$mod" "${DASH_DESCS[$row_idx]}" ;;
-    skip)  printf "  ${DIM}%-10s  %-40s  ────  ${detail:-skipped}${RESET}\033[K\n" "$mod" "$desc" ;;
+    ready) _dash_paint_bar "$mod" "$desc" "$GREEN" "█" ;;
+    warn)  _dash_paint_bar "$mod" "$detail · ${DASH_DESCS[$row_idx]}" "$YELLOW" "▓" ;;
+    skip)  _dash_paint_bar "$mod" "${detail:-skipped}" "$DIM" "─" ;;
   esac
-  local down=$((up - 1))
-  [ "$down" -gt 0 ] && printf "\033[${down}B\r"
   return 0
+}
+
+# Close the box (called after the last dash_update)
+dash_close() {
+  if [ "$NO_ANIM" = "1" ] || [ ! -t 1 ]; then return; fi
+  printf "  ${CYAN}╰"
+  local i=0
+  while [ $i -lt $DASH_BOX_WIDTH ]; do printf "─"; i=$((i+1)); done
+  printf "╯${RESET}\n"
 }
 
 # ---------- preflight + mode detection ----------
@@ -1119,15 +1401,16 @@ COUNT_INSTALLED=0
 
 # ---------- dashboard + silent install ----------
 # One-line pitch a non-techie can grok before the table lights up.
-printf "\n  ${BOLD}dropping a .agent/ scaffold into this repo${RESET}\n"
-printf "  ${DIM}your AI gets: a personality, a memory, a task ledger, and 130 patterns inherited from the Trilogy AI COE${RESET}\n"
+printf "\n  ${BOLD}v2.0 · agent in a box${RESET}  ${DIM}beads · instincts · verify · learn · audit${RESET}\n"
 
 dash_init
-dash_add "scaffold" "personality + operating rules + identity"
-dash_add "memory"   "long-term, short-term, handoff, ledger"
-dash_add "skills"   "substack retrieval (cited)"
-dash_add "hooks"    "claude, codex, cursor, windsurf"
-dash_add "runtime"  "python3, npx, git"
+dash_add "scaffold"  "soul · agent · north_star · 130 patterns"
+dash_add "memory"    "beads + ledger + bd-rank prioritizer"
+dash_add "instincts" "${#SCAFFOLD_INSTINCTS[@]} reflex patterns (v2)"
+dash_add "skills"    "plan · verify · learn · memory · substack"
+dash_add "profile"   "$AGENTIZE_PROFILE"
+dash_add "hooks"     "claude · codex · cursor · windsurf"
+dash_add "runtime"   "python · npx · git"
 
 # scaffold: core templates
 for t in "${SCAFFOLD_TEMPLATES[@]}"; do
@@ -1180,6 +1463,14 @@ done
 sleep 0.08
 dash_update "memory" ready "long-term, short-term, handoff, ledger"
 
+# v2.0: instincts — reflex patterns
+mkdir -p "$TARGET_DIR/memory/instincts"
+for f in "${SCAFFOLD_INSTINCTS[@]}"; do
+  fetch_file "memory-scaffold/instincts/${f}" "$TARGET_DIR/memory/instincts/${f}"
+  COUNT_REFRESHED=$((COUNT_REFRESHED+1))
+done
+dash_update "instincts" ready "$((${#SCAFFOLD_INSTINCTS[@]} - 1)) reflex patterns active"
+
 # skills
 for f in "${SKILLS_FILES[@]}"; do
   fetch_file "skills-scaffold/${f}" "$TARGET_DIR/skills/${f}"
@@ -1188,6 +1479,8 @@ done
 chmod +x "$TARGET_DIR/skills/search-substack.sh"
 chmod +x "$TARGET_DIR/skills/memory-search.sh" 2>/dev/null || true
 chmod +x "$TARGET_DIR/skills/plan.sh" 2>/dev/null || true
+chmod +x "$TARGET_DIR/skills/verify.sh" 2>/dev/null || true
+chmod +x "$TARGET_DIR/skills/learn.sh" 2>/dev/null || true
 
 # Ensure wwvcd (retrieval skill) is available. Try global install first;
 # fall back to warming the npx cache; silently accept if neither works
@@ -1215,7 +1508,7 @@ case "$WWVCD_STATE" in
 esac
 
 # Write marker
-printf "youragent-scaffold\nversion=%s\ninstalled=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$MARKER_FILE"
+printf "youragent-scaffold\nversion=%s\ninstalled=%s\nprofile=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENTIZE_PROFILE" > "$MARKER_FILE"
 
 # --- OpenClaw-aware extras (only if there's an openclaw instance to link to) ---
 # Drops .agent/OPENCLAW.md (guidance) + .agent/openclaw/{BRIDGE,GLOBAL_NOTES}.md
@@ -1361,6 +1654,10 @@ else
   dash_update "hooks" ready "claude, codex, cursor, windsurf, .agents/skills"
 fi
 
+# profile
+sleep 0.05
+dash_update "profile" ready "$AGENTIZE_PROFILE"
+
 # runtime
 RUNTIME_WARN=()
 command -v python3 >/dev/null 2>&1 || RUNTIME_WARN+=("python3")
@@ -1370,8 +1667,11 @@ sleep 0.08
 if [ ${#RUNTIME_WARN[@]} -gt 0 ]; then
   dash_update "runtime" warn "missing: ${RUNTIME_WARN[*]}"
 else
-  dash_update "runtime" ready "python3, npx, git"
+  dash_update "runtime" ready "python3 · npx · git"
 fi
+
+# close the dashboard box
+dash_close
 
 # surface any hook warnings below the dashboard
 if [ ${#HOOK_WARN[@]} -gt 0 ]; then
@@ -1381,135 +1681,35 @@ if [ ${#HOOK_WARN[@]} -gt 0 ]; then
   done
 fi
 
-# ---------- dense info panels ----------
-# Reveal a row with a small delay (or instant if NO_ANIM).
-row_reveal() {
-  printf "%s\n" "$1"
-  [ "$NO_ANIM" = "1" ] || [ ! -t 1 ] || sleep 0.015
-}
-panel() {
-  local title="$1"
-  printf "\n  ${BOLD}${CYAN}━━━ %s ${RESET}${CYAN}" "$title"
-  local remaining=$((62 - ${#title}))
-  while [ $remaining -gt 0 ]; do printf "━"; remaining=$((remaining-1)); done
-  printf "${RESET}\n"
-}
+# ---------- condensed reference (v2.0) ----------
+row_reveal() { printf "%s\n" "$1"; [ "$NO_ANIM" = "1" ] || [ ! -t 1 ] || sleep 0.012; }
 
-# --- panel: what's in .agent/ ---
-panel "WHAT'S IN .agent/"
-row_reveal "  ${BOLD}CORE${RESET}  ${DIM}tool-authored · refreshed safely on every run${RESET}"
-row_reveal "  ${DIM}  SOUL              personality · opinionated, brief, no corporate${RESET}"
-row_reveal "  ${DIM}  AGENT             operating manual · plan-first, evidence-on-close${RESET}"
-row_reveal "  ${DIM}  NORTH_STAR        session orientation for this repo${RESET}"
-row_reveal "  ${DIM}  HUMAN_GUIDE       read me first (for you, not the agent)${RESET}"
-row_reveal "  ${DIM}  TWEAKING          how to dial the personality${RESET}"
-row_reveal "  ${DIM}  KNOWLEDGE_PACK    article index${RESET}"
-row_reveal "  ${DIM}  PATTERNS_CATALOG  130 patterns inherited from 14 Trilogy AI COE articles${RESET}"
-row_reveal "  ${DIM}  GOGCLI_STARTER    Gmail / Docs / Calendar on-ramp${RESET}"
-row_reveal "  ${DIM}  GETTING_STARTED   first-time agentic onboarding (10 min)${RESET}"
-row_reveal "  ${DIM}  memory/README     bead rules${RESET}"
-row_reveal "  ${DIM}  memory/bd.sh bead CLI (python3)${RESET}"
-row_reveal "  ${DIM}  memory/bd-rank.sh score-based prioritizer (importance + impact + validity)${RESET}"
-row_reveal "  ${DIM}  skills/README + skills/search-substack.sh + skills/memory-search.sh${RESET}"
-row_reveal "  ${DIM}  skills/plan.sh    perfect-plan checklist + validator (cites the CoE article)${RESET}"
-if [ "${OPENCLAW_SCAFFOLDED:-no}" = "yes" ]; then
-  row_reveal "  ${DIM}  OPENCLAW.md       OpenClaw memory routing + bridge guidance${RESET}"
-fi
-row_reveal ""
-row_reveal "  ${BOLD}PERSONAL${RESET}  ${DIM}yours · created once · never overwritten${RESET}"
-row_reveal "  ${DIM}  IDENTITY          your agent's name + purpose${RESET}"
-row_reveal "  ${DIM}  USER              about you${RESET}"
-row_reveal "  ${DIM}  TOOLS             expected + recommended tools${RESET}"
-row_reveal "  ${DIM}  MEMORY            long-term facts${RESET}"
-row_reveal "  ${DIM}  LESSONS_LEARNED   mistake log${RESET}"
-row_reveal "  ${DIM}  memory/BEADS      task ledger (the agent closes these with evidence)${RESET}"
-row_reveal "  ${DIM}  memory/PROMPTS · memory/HANDOFF · memory/SHORT_TERM_MEMORY${RESET}"
-if [ "${OPENCLAW_SCAFFOLDED:-no}" = "yes" ]; then
-  row_reveal "  ${DIM}  openclaw/BRIDGE.md        per-repo overrides to global personality${RESET}"
-  row_reveal "  ${DIM}  openclaw/GLOBAL_NOTES.md  things to promote into global memory${RESET}"
-fi
-
-# --- panel: auto-wired hooks ---
-panel "AUTO-WIRED HOOKS"
-row_reveal "  ${GREEN}✓${RESET}  ${BOLD}CLAUDE.md${RESET}       ${DIM}Claude Code reads this automatically on session start${RESET}"
-row_reveal "  ${GREEN}✓${RESET}  ${BOLD}AGENTS.md${RESET}       ${DIM}Codex reads this automatically on session start${RESET}"
-row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.cursorrules${RESET}    ${DIM}Cursor reads this automatically on session start${RESET}"
-row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.windsurfrules${RESET}  ${DIM}Windsurf reads this automatically on session start${RESET}"
-case "$AGENTS_COMPAT_STATE" in
-  linked) row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.agents/skills/${RESET} ${DIM}→ .agent/skills (cross-harness path: codex, opencode, copilot, gemini cli, …)${RESET}" ;;
-  copied) row_reveal "  ${GREEN}✓${RESET}  ${BOLD}.agents/skills/${RESET} ${DIM}(copy of .agent/skills; symlink unavailable on this filesystem)${RESET}" ;;
-  skipped) row_reveal "  ${DIM}·  .agents/skills/  already exists — left alone${RESET}" ;;
-esac
-
-# --- panel: runtime ---
-panel "RUNTIME"
-_rt_status() { if command -v "$1" >/dev/null 2>&1; then printf "${GREEN}✓${RESET}"; else printf "${RED}!${RESET}"; fi; }
-_rt_line() {
-  local cmd="$1" desc="$2"
-  local status; status=$(_rt_status "$cmd")
-  row_reveal "$(printf "  %s  ${BOLD}%-8s${RESET}${DIM}%s${RESET}" "$status" "$cmd" "$desc")"
-}
-_rt_line "python3" "bd + bd-rank (task ledger + prioritizer) run on this"
-_rt_line "npx"     "package runner — boots npm-delivered tools on demand"
-_rt_line "git"     "version control + rollback safety"
-# wwvcd: reflect the state we determined during skills install
+# Single 3-line ref panel — `agentize status` is the full surface map now.
+printf "\n"
+row_reveal "  ${BOLD}.agent/${RESET}  ${DIM}identity · soul · agent · 130 patterns · instincts/ · skills/ · memory/${RESET}"
+row_reveal "  ${BOLD}wired${RESET}    ${DIM}CLAUDE.md · AGENTS.md · .cursorrules · .windsurfrules · .agents/skills (cross-harness)${RESET}"
 case "$WWVCD_STATE" in
-  already-installed|global)
-    row_reveal "  ${GREEN}✓${RESET}  ${BOLD}wwvcd${RESET}    ${DIM}retrieval skill — 1,191 deep findings from Claude Code source${RESET}" ;;
-  npx-cached)
-    row_reveal "  ${GREEN}✓${RESET}  ${BOLD}wwvcd${RESET}    ${DIM}retrieval skill — warmed in npx cache (no global perms)${RESET}" ;;
+  already-installed|global|npx-cached)
+    row_reveal "  ${BOLD}runtime${RESET}  ${DIM}python · npx · git · wwvcd (retrieval skill, 1,191 Claude Code findings)${RESET}" ;;
   *)
-    row_reveal "  ${YELLOW}!${RESET}  ${BOLD}wwvcd${RESET}    ${DIM}retrieval skill — will fetch on first ${BOLD}${MAGENTA}npx wwvcd${RESET}${DIM} call${RESET}" ;;
+    row_reveal "  ${BOLD}runtime${RESET}  ${DIM}python · npx · git · wwvcd (lazy-loaded — ${BOLD}npx wwvcd${RESET}${DIM} on demand)${RESET}" ;;
 esac
 
-# Surface unlinked-hook warnings here (full detail, below the wiring panel).
-if [ ${#HOOK_WARN[@]} -gt 0 ]; then
-  printf "\n"
-  for w in "${HOOK_WARN[@]}"; do
-    printf "  ${YELLOW}!${RESET} ${DIM}%s${RESET}\n" "$w"
-  done
-fi
-
-# --- panel: agentized · what to do next ---
-panel "AGENTIZED · WHAT TO DO NEXT"
+# --- next steps ---
+printf "\n"
 if [ "$INSTALL_MODE" = "update" ]; then
-  row_reveal "  ${GREEN}${BOLD}updated to v${SCAFFOLD_VERSION}${RESET}  ${DIM}· re-run ${BOLD}npx agentize${RESET}${DIM} anytime, safe${RESET}"
+  row_reveal "  ${GREEN}${BOLD}→ updated to v${SCAFFOLD_VERSION}${RESET}  ${DIM}safe re-run · personal files preserved${RESET}"
 else
-  row_reveal "  ${CYAN}1${RESET}  ${BOLD}open${RESET} claude code / codex / cursor / windsurf in this repo  ${DIM}(auto-reads .agent/)${RESET}"
-  row_reveal "  ${CYAN}2${RESET}  ${BOLD}give it a real task${RESET}  ${DIM}— it'll plan, track beads, close with evidence${RESET}"
-  row_reveal "  ${DIM}     aider: paste 'Read .agent/NORTH_STAR.md to orient' at session start${RESET}"
+  row_reveal "  ${CYAN}1${RESET}  ${BOLD}open${RESET} claude / codex / cursor / windsurf  ${DIM}(auto-reads .agent/)${RESET}"
+  row_reveal "  ${CYAN}2${RESET}  ${BOLD}./.agent/memory/bd-rank.sh ready${RESET}  ${DIM}(prioritized next task)${RESET}"
+  row_reveal "  ${CYAN}3${RESET}  ${BOLD}npx agentize audit${RESET}  ${DIM}(liveness score 0-100, run anytime)${RESET}"
   if [ -f "$HOME/.openclaw/openclaw.json" ]; then
-    row_reveal "  ${DIM}     openclaw: run ${BOLD}${MAGENTA}npx agentize configure-openclaw${RESET}${DIM} to wire all your agents${RESET}"
+    row_reveal "  ${CYAN}4${RESET}  ${BOLD}npx agentize configure-openclaw${RESET}  ${DIM}(wire global agents)${RESET}"
   fi
 fi
 
 row_reveal ""
-row_reveal "  ${BOLD}AUTONOMOUS MODE${RESET}  ${DIM}(after 2-3 tasks you trust it)${RESET}"
-row_reveal "  ${DIM}  claude     ${RESET}${BOLD}${MAGENTA}claude --dangerously-skip-permissions${RESET}"
-row_reveal "  ${DIM}  codex      ${RESET}${BOLD}${MAGENTA}codex --yolo${RESET}"
-row_reveal "  ${DIM}  aider      ${RESET}${BOLD}${MAGENTA}aider --yes${RESET}"
-row_reveal "  ${DIM}  cursor / windsurf    agent mode + auto-approve in settings${RESET}"
-
-row_reveal ""
-row_reveal "  ${BOLD}HANDY COMMANDS${RESET}"
-row_reveal "  ${MAGENTA}npx agentize${RESET}                ${DIM}re-run anytime — safe update${RESET}"
-row_reveal "  ${MAGENTA}npx agentize plan${RESET}           ${DIM}dry-run preview without writing anything${RESET}"
-row_reveal "  ${MAGENTA}npx agentize status${RESET}         ${DIM}what your agent knows right now${RESET}"
-row_reveal "  ${MAGENTA}npx agentize validate${RESET}       ${DIM}scaffold health check${RESET}"
-row_reveal "  ${MAGENTA}npx agentize update-check${RESET}   ${DIM}am i on the latest?${RESET}"
-row_reveal "  ${MAGENTA}npx agentize uninstall${RESET}      ${DIM}clean removal${RESET}"
-row_reveal "  ${MAGENTA}npx agentize help${RESET}           ${DIM}full subcommand reference${RESET}"
-if openclaw_present; then
-  row_reveal "  ${MAGENTA}npx agentize openclaw-check${RESET} ${DIM}report openclaw agents' integration drift${RESET}"
-  row_reveal "  ${MAGENTA}npx agentize from-openclaw${RESET}  ${DIM}seed .agent/ using an agent's identity (run in workspace)${RESET}"
-fi
-
-row_reveal ""
-row_reveal "  ${BOLD}WHERE TO READ${RESET}"
-row_reveal "  ${DIM}  .agent/NORTH_STAR.md        orient for this repo${RESET}"
-row_reveal "  ${DIM}  .agent/GETTING_STARTED.md   first-time agentic onboarding (10 min)${RESET}"
-row_reveal "  ${DIM}  .agent/PATTERNS_CATALOG.md  130 patterns your agent inherited${RESET}"
-row_reveal "  ${DIM}  .agent/TWEAKING.md          personality too sharp? dial it here${RESET}"
-row_reveal "  ${DIM}  .agent/GOGCLI_STARTER.md    wire the agent into Gmail / Docs / Calendar${RESET}"
+row_reveal "  ${DIM}autonomous: ${RESET}${MAGENTA}claude --dangerously-skip-permissions${RESET}${DIM} · ${RESET}${MAGENTA}codex --yolo${RESET}${DIM} · ${RESET}${MAGENTA}aider --yes${RESET}"
+row_reveal "  ${DIM}more:       ${RESET}${MAGENTA}npx agentize help${RESET}${DIM} · ${RESET}${MAGENTA}npx agentize status --markdown${RESET}${DIM} (handoff doc)${RESET}"
 
 printf "\n  ${DIM}Built by Trilogy AI Center of Excellence · trilogyai.substack.com${RESET}\n\n"

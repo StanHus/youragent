@@ -7,6 +7,8 @@
 ## What's here
 
 - `plan.sh` — perfect-plan checklist + validator ([source article](https://trilogyai.substack.com/p/how-to-build-a-perfect-plan))
+- `verify.sh` — evidence-truthing layer for bead close-reasons (v2.0)
+- `learn.sh` — propose new instincts from session memory (v2.0)
 - `memory-search.sh` — cross-repo + global memory search
 - `search-substack.sh` — query CoE + Stan substacks
 

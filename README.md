@@ -4,6 +4,10 @@
 >
 > This isn't "set up a folder." This ships the **[Trilogy AI Center of Excellence](https://trilogyai.substack.com/) methodology** on top of a bead-graph task system inspired by **[Steve Yegge's Beads](https://github.com/steveyegge/beads)** — spiky takes, evidence-on-close, and a 130-pattern knowledge base your agent inherits on install.
 
+### v2.0 — instincts, verify, learn, audit, handoff
+
+Now ships with **reflex instincts** (short trigger/action/evidence files the agent reads on session start), **`verify.sh`** (truth-checks bead close-reasons against the filesystem), **`learn.sh`** (proposes new instincts from your session memory), **`agentize audit`** (0-100 liveness score across 8 dimensions), **`agentize status --markdown`** (portable handoff doc), and **`AGENTIZE_PROFILE=minimal|standard|strict`** (scale strictness without editing files). The install dashboard is condensed to a dense module grid that animates in ~2 seconds.
+
 [![npm](https://img.shields.io/npm/v/agentize.svg?label=agentize)](https://www.npmjs.com/package/agentize)
 [![total downloads agentize](https://img.shields.io/npm/dt/agentize.svg?label=agentize%20downloads)](https://www.npmjs.com/package/agentize)
 [![total downloads youragent](https://img.shields.io/npm/dt/youragent.svg?label=youragent%20downloads%20(legacy))](https://www.npmjs.com/package/youragent)
