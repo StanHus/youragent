@@ -19,7 +19,7 @@ set -euo pipefail
 SUBCOMMAND="${1:-install}"
 
 # ---------- config ----------
-SCAFFOLD_VERSION="2.0.0"
+SCAFFOLD_VERSION="2.1.0"
 RAW_BASE="${BOOTSTRAP_RAW_BASE:-https://raw.githubusercontent.com/stanhus/youragent/main}"
 SRC_DIR="${BOOTSTRAP_LOCAL_SRC:-}"
 TARGET_DIR="${BOOTSTRAP_TARGET:-$PWD/.agent}"
@@ -47,6 +47,9 @@ USER_MEMORY=(BEADS.md PROMPTS.md HANDOFF.md SHORT_TERM_MEMORY.md)
 # v2.0: instincts/ — short operational reflexes (trigger/action/evidence)
 SCAFFOLD_INSTINCTS=(README.md bd-rank-first.md evidence-or-die.md retrieve-before-invent.md plan-before-touch.md lessons-on-mistake.md dont-narrate.md)
 SKILLS_FILES=(search-substack.sh memory-search.sh plan.sh verify.sh learn.sh README.md)
+# v2.1: mesh — filesystem inbox/outbox so agentize nodes in one tree can talk
+# (opt-in per node). We own these; config.json is per-node and skip-if-exists.
+MESH_FILES=(mesh.sh README.md)
 
 # ---------- colors ----------
 if [ -t 1 ] && [ "$NO_ANIM" != "1" ]; then
@@ -236,6 +239,7 @@ def required_paths():
         os.path.join("memory", "bd.sh"),
         os.path.join("memory", "bd-rank.sh"),
         os.path.join("skills", "search-substack.sh"),
+        os.path.join("mesh", "mesh.sh"),
     ]
 
 def hook_targets():
@@ -664,6 +668,28 @@ if [ "$SUBCOMMAND" = "audit" ]; then
   exit $?
 fi
 
+# ---------- mesh subcommand (delegates to installed .agent/mesh/mesh.sh) ----------
+cmd_mesh() {
+  # Find the nearest ancestor with a mesh so `agentize mesh …` works from any
+  # subdir of the repo, not just its root.
+  local dir="$PWD" mesh_sh=""
+  while :; do
+    if [ -f "$dir/.agent/mesh/mesh.sh" ]; then mesh_sh="$dir/.agent/mesh/mesh.sh"; break; fi
+    [ "$dir" = "/" ] || [ -z "$dir" ] && break
+    dir="$(dirname "$dir")"
+  done
+  if [ -z "$mesh_sh" ]; then
+    printf "\n  ${DIM}No mesh installed here. Run ${BOLD}npx agentize${RESET}${DIM} first, then ${BOLD}npx agentize mesh init${RESET}${DIM}.${RESET}\n\n"
+    exit 1
+  fi
+  shift  # drop 'mesh'; forward the rest (init | send | peers | inbox | poll | …)
+  exec bash "$mesh_sh" "$@"
+}
+
+if [ "$SUBCOMMAND" = "mesh" ]; then
+  cmd_mesh "$@"
+fi
+
 # ---------- configure-openclaw subcommand ----------
 find_openclaw_configure_script() {
   local script_entry package_dir target
@@ -847,6 +873,16 @@ cmd_plan() {
   for t in "${SKILLS_FILES[@]}"; do
     printf "    ${GREEN}+${RESET} .agent/skills/%s\n" "$t"
   done
+  for t in "${MESH_FILES[@]}"; do
+    printf "    ${GREEN}+${RESET} .agent/mesh/%s\n" "$t"
+  done
+
+  printf "\n  ${BOLD}agent mesh${RESET}  ${DIM}(inbox/outbox — opt-in per node)${RESET}\n"
+  if [ -f "$agent_dir/mesh/config.json" ]; then
+    printf "    ${DIM}·${RESET} .agent/mesh/config.json  ${DIM}kept (node already initialised)${RESET}\n"
+  else
+    printf "    ${DIM}·${RESET} .agent/mesh/config.json  ${DIM}created on 'agentize mesh init'${RESET}\n"
+  fi
 
   printf "\n  ${BOLD}personal files${RESET}  ${DIM}(created once · never overwritten)${RESET}\n"
   for t in "${USER_TEMPLATES[@]}"; do
@@ -1130,6 +1166,16 @@ cmd_help() {
     ${MAGENTA}npx agentize openclaw-check${RESET}      ${DIM}drift report for wired agents${RESET}
     ${MAGENTA}npx agentize from-openclaw${RESET}       ${DIM}reverse install: seed from agent's identity${RESET}
 
+  ${BOLD}mesh${RESET}  ${DIM}(agent-to-agent inbox/outbox across the repo tree)${RESET}
+    ${MAGENTA}npx agentize mesh init${RESET}          ${DIM}opt this node into the mesh${RESET}
+    ${MAGENTA}npx agentize mesh peers${RESET}         ${DIM}peer nodes in scope (1 up · 2 down) + liveness${RESET}
+    ${MAGENTA}npx agentize mesh send <p> "…"${RESET}  ${DIM}drop a message into a peer's inbox${RESET}
+    ${MAGENTA}npx agentize mesh inbox${RESET}         ${DIM}what other agents sent you${RESET}
+    ${MAGENTA}npx agentize mesh install-loop${RESET}  ${DIM}detect/auto-wake a session on new mail (launchd/cron)${RESET}
+    ${MAGENTA}npx agentize mesh uninstall-loop${RESET} ${DIM}remove the schedule (reversible)${RESET}
+    ${MAGENTA}npx agentize mesh doctor${RESET}        ${DIM}peer liveness report${RESET}
+    ${DIM}bare${RESET} ${MAGENTA}npx agentize mesh${RESET} ${DIM}→ full command list (read · ack · status · heartbeat · poll)${RESET}
+
   ${BOLD}skills${RESET}  ${DIM}(installed at .agent/skills/ — run directly)${RESET}
     ${CYAN}.agent/skills/plan.sh${RESET}              ${DIM}perfect-plan checklist + validator${RESET}
     ${CYAN}.agent/skills/verify.sh${RESET}            ${DIM}evidence-truth bead close-reasons (anti-bullshit)${RESET}
@@ -1408,6 +1454,7 @@ dash_add "scaffold"  "soul · agent · north_star · 130 patterns"
 dash_add "memory"    "beads + ledger + bd-rank prioritizer"
 dash_add "instincts" "${#SCAFFOLD_INSTINCTS[@]} reflex patterns (v2)"
 dash_add "skills"    "plan · verify · learn · memory · substack"
+dash_add "mesh"      "inbox/outbox · peers 1 up · 2 down"
 dash_add "profile"   "$AGENTIZE_PROFILE"
 dash_add "hooks"     "claude · codex · cursor · windsurf"
 dash_add "runtime"   "python · npx · git"
@@ -1506,6 +1553,16 @@ case "$WWVCD_STATE" in
   npx-cached)        dash_update "skills" ready "substack retrieval (cited), wwvcd via npx (cached)" ;;
   *)                 dash_update "skills" ready "substack retrieval (cited)" ;;
 esac
+
+# v2.1: mesh — inbox/outbox scaffold (opt-in; files refreshed, config kept)
+mkdir -p "$TARGET_DIR/mesh"
+for f in "${MESH_FILES[@]}"; do
+  fetch_file "mesh-scaffold/${f}" "$TARGET_DIR/mesh/${f}"
+  COUNT_REFRESHED=$((COUNT_REFRESHED+1))
+done
+chmod +x "$TARGET_DIR/mesh/mesh.sh" 2>/dev/null || true
+sleep 0.05
+dash_update "mesh" ready "opt-in with 'agentize mesh init'"
 
 # Write marker
 printf "youragent-scaffold\nversion=%s\ninstalled=%s\nprofile=%s\n" "$SCAFFOLD_VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AGENTIZE_PROFILE" > "$MARKER_FILE"
@@ -1686,8 +1743,9 @@ row_reveal() { printf "%s\n" "$1"; [ "$NO_ANIM" = "1" ] || [ ! -t 1 ] || sleep 0
 
 # Single 3-line ref panel — `agentize status` is the full surface map now.
 printf "\n"
-row_reveal "  ${BOLD}.agent/${RESET}  ${DIM}identity · soul · agent · 130 patterns · instincts/ · skills/ · memory/${RESET}"
+row_reveal "  ${BOLD}.agent/${RESET}  ${DIM}identity · soul · agent · 130 patterns · instincts/ · skills/ · mesh/ · memory/${RESET}"
 row_reveal "  ${BOLD}wired${RESET}    ${DIM}CLAUDE.md · AGENTS.md · .cursorrules · .windsurfrules · .agents/skills (cross-harness)${RESET}"
+row_reveal "  ${BOLD}mesh${RESET}     ${DIM}agent-to-agent inbox/outbox — ${RESET}${MAGENTA}npx agentize mesh init${RESET}${DIM} to opt in${RESET}"
 case "$WWVCD_STATE" in
   already-installed|global|npx-cached)
     row_reveal "  ${BOLD}runtime${RESET}  ${DIM}python · npx · git · wwvcd (retrieval skill, 1,191 Claude Code findings)${RESET}" ;;

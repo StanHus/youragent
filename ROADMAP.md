@@ -30,6 +30,24 @@ The best version of `agentize` is:
 
 If it tries to become a hosted agent platform, it will get bloated and lose the only thing that makes it sharp: it lives in the repo and works with the tools people already use.
 
+## Shipped
+
+### v2.1 — Agent mesh (filesystem inbox/outbox)
+
+Nodes in one directory tree can now exchange messages directly through the
+filesystem: `agentize mesh {init,peers,send,inbox,poll,install-loop}`. Scope
+is the parent subtree (1 up, 2 down); transport is plain files; delivery is
+pull-based (a poller wakes a fresh session on new mail) on the assumption
+that a stateless agent runs in each node. Opt-in per node, with an
+untrusted-inbox trust boundary so a peer message can never override a node's
+own rules.
+
+This is deliberately **not** the "custom multi-agent runner" listed under
+*What Not To Build Yet*: no hosted backend, no long-lived broker, no bespoke
+runtime — the mesh reuses whatever agent CLI the user already runs (`claude`,
+`codex`, `aider`) as the executor. It stays true to the thesis: the value
+lives in the repo and works with the tools people already have.
+
 ## Priority Roadmap
 
 ### P1. Scaffold Health
@@ -131,7 +149,7 @@ Why later:
 ## What Not To Build Yet
 
 - A hosted memory backend.
-- A custom multi-agent runner.
+- A custom multi-agent *runtime* (a hosted broker or long-lived scheduler). The v2.1 mesh is the opposite of this — filesystem-only, opt-in, and it reuses the user's own agent CLI.
 - A marketplace before the core workflow/doctor story is strong.
 - Fancy telemetry dashboards without a strong validator underneath.
 
