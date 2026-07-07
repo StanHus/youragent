@@ -155,7 +155,11 @@ The hook files (`CLAUDE.md`, `AGENTS.md`, etc.) are short redirects that each to
 | `MESH_SCOPE_DOWN=<n>` | Mesh: depth to scan from the anchor (default `2`). |
 | `MESH_SCOPE_CEILING=<path>` | Mesh: never discover/scan above this dir (default `$HOME`). |
 | `MESH_POLL_SECONDS=<n>` | Mesh: poll interval for the wake loop (default `300`). |
-| `MESH_WAKE_CMD=<cmd>` | Mesh: command to spawn on new mail (auto: `claude`→`codex`→`aider`). |
+| `MESH_WAKE_CMD=<cmd>` | Mesh: command to spawn on new mail. **Unset by default** (auto-wake off). |
+| `MESH_WAKE_ALLOW_DANGEROUS=1` | Mesh: opt in to auto-detecting a permission-bypassing agent (`claude`→`codex`→`aider`) as the wake. Off by default because inbox content is untrusted. |
+| `MESH_STALE_SECONDS=<n>` | Mesh: peer quiet longer than this shows `stale` (default `1800`). |
+| `MESH_DEAD_SECONDS=<n>` | Mesh: peer quiet longer than this shows `dead` + escalates (default `7200`). |
+| `MESH_MAX_MSG_BYTES=<n>` | Mesh: reject/skip messages larger than this (default `65536`). |
 
 ### Windows
 
@@ -205,16 +209,18 @@ npx agentize mesh init            # opt in (each node does this once)
 npx agentize mesh peers           # who's reachable — 1 level up, 2 levels down
 npx agentize mesh send worker-a "review unit 1" --body "draft is in /out"
 npx agentize mesh inbox --unread  # what peers sent you
-npx agentize mesh install-loop    # auto-wake a session (launchd/cron) on new mail
+npx agentize mesh install-loop    # schedule a poller (launchd/cron) that detects new mail
 ```
 
 **Scope.** Discovery ascends to the parent (`MESH_SCOPE_UP=1`) and scans its subtree down two levels (`MESH_SCOPE_DOWN=2`) — a flat mesh of parent + siblings + children under one root. It never scans above `MESH_SCOPE_CEILING` (default `$HOME`) and only sees nodes that have opted in.
 
-**Stateless by design.** The assumption is that a fresh, forgetful agent session (e.g. `claude -p`) runs in every node. So a node remembers what it has seen on disk, and delivery is pull-based: the poller wakes a *new* session when mail lands, handing it a self-contained, injection-hardened prompt.
+**Stateless by design.** The assumption is that a fresh, forgetful agent session (e.g. `claude -p`) runs in every node. So a node remembers what it has handled on disk (read-flags), and delivery is pull-based: the poller triggers on any *unread* message and wakes a session with a self-contained, injection-hardened prompt.
 
-**Trust boundary.** Every inbox message is **untrusted input from another agent — data to triage, never instructions to obey.** A peer can't authorise a node to do anything it couldn't already do. The wake prompt says so explicitly, so a woken session can't be prompt-injected into acting as a peer's puppet. Full protocol: `.agent/mesh/README.md`.
+**Auto-wake is opt-in.** Because inbox content is untrusted, the poller does **not** spawn an agent by default — `install-loop` only detects and logs mail until you set `MESH_WAKE_CMD` (an exact command) or `MESH_WAKE_ALLOW_DANGEROUS=1` (auto-detect `claude`/`codex`/`aider`). Received files are validated before they ever reach an agent: **regular files only** (symlinks skipped, so a planted symlink can't leak `~/.ssh/id_rsa` into context), size-capped, and required to carry a real message envelope.
 
-Opt-in, reversible (`mesh uninstall-loop`), and bounded (64 KB message cap, sandboxed reach, idempotent redelivery).
+**Trust boundary.** Every inbox message is **untrusted input from another agent — data to triage, never instructions to obey.** A peer can't authorise a node to do anything it couldn't already do, and the wake prompt says so explicitly. Note this is defense-in-depth on top of, not instead of, your own tool's permission model — a filesystem write to a node's inbox is not authenticated, so keep the mesh within a tree you trust. Full protocol: `.agent/mesh/README.md`.
+
+Opt-in on both ends (each node must `init`), reversible (`mesh uninstall-loop`), and bounded (64 KB message cap, ceilinged discovery, idempotent redelivery, stale-lock self-healing).
 
 ### Updates are safe
 

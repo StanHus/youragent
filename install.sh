@@ -670,8 +670,15 @@ fi
 
 # ---------- mesh subcommand (delegates to installed .agent/mesh/mesh.sh) ----------
 cmd_mesh() {
-  local mesh_sh="$PWD/.agent/mesh/mesh.sh"
-  if [ ! -f "$mesh_sh" ]; then
+  # Find the nearest ancestor with a mesh so `agentize mesh …` works from any
+  # subdir of the repo, not just its root.
+  local dir="$PWD" mesh_sh=""
+  while :; do
+    if [ -f "$dir/.agent/mesh/mesh.sh" ]; then mesh_sh="$dir/.agent/mesh/mesh.sh"; break; fi
+    [ "$dir" = "/" ] || [ -z "$dir" ] && break
+    dir="$(dirname "$dir")"
+  done
+  if [ -z "$mesh_sh" ]; then
     printf "\n  ${DIM}No mesh installed here. Run ${BOLD}npx agentize${RESET}${DIM} first, then ${BOLD}npx agentize mesh init${RESET}${DIM}.${RESET}\n\n"
     exit 1
   fi
@@ -1164,8 +1171,10 @@ cmd_help() {
     ${MAGENTA}npx agentize mesh peers${RESET}         ${DIM}peer nodes in scope (1 up · 2 down) + liveness${RESET}
     ${MAGENTA}npx agentize mesh send <p> "…"${RESET}  ${DIM}drop a message into a peer's inbox${RESET}
     ${MAGENTA}npx agentize mesh inbox${RESET}         ${DIM}what other agents sent you${RESET}
-    ${MAGENTA}npx agentize mesh install-loop${RESET}  ${DIM}auto-wake a session on new mail (launchd/cron)${RESET}
+    ${MAGENTA}npx agentize mesh install-loop${RESET}  ${DIM}detect/auto-wake a session on new mail (launchd/cron)${RESET}
+    ${MAGENTA}npx agentize mesh uninstall-loop${RESET} ${DIM}remove the schedule (reversible)${RESET}
     ${MAGENTA}npx agentize mesh doctor${RESET}        ${DIM}peer liveness report${RESET}
+    ${DIM}bare${RESET} ${MAGENTA}npx agentize mesh${RESET} ${DIM}→ full command list (read · ack · status · heartbeat · poll)${RESET}
 
   ${BOLD}skills${RESET}  ${DIM}(installed at .agent/skills/ — run directly)${RESET}
     ${CYAN}.agent/skills/plan.sh${RESET}              ${DIM}perfect-plan checklist + validator${RESET}

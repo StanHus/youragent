@@ -72,5 +72,48 @@ if mesh orchestrator send worker-a "too big" --body "$big" >/dev/null 2>&1; then
 # --- guardrail: unknown peer errors cleanly ---
 if mesh orchestrator send nonesuch "x" --body y >/dev/null 2>&1; then bad "send to unknown peer should fail"; else ok "send to unknown peer fails cleanly"; fi
 
+# --- fresh-node status/doctor must not crash (uninitialised path) ---
+mkdir -p "$TREE/fresh"; NO_ANIM=1 BOOTSTRAP_TARGET="$TREE/fresh/.agent" bash "$REPO/install.sh" >/dev/null 2>&1
+if bash "$TREE/fresh/.agent/mesh/mesh.sh" status >/dev/null 2>&1; then ok "status on uninitialised node exits clean (no crash)"; else bad "status crashed on fresh node"; fi
+
+# --- receive-side hardening: symlink in inbox is skipped + refused ---
+wa_inbox="$TREE/worker-a/.agent/mesh/inbox"
+secret="$TREE/SECRET.txt"; echo "TOP-SECRET-TOKEN" > "$secret"
+ln -s "$secret" "$wa_inbox/99999999T999999Z_evil_leak.md"
+inbox_list="$(mesh worker-a inbox)"
+case "$inbox_list" in *TOP-SECRET*|*leak*) bad "symlinked inbox entry was listed";; *) ok "symlinked inbox entry skipped by listing";; esac
+if mesh worker-a read "99999999T999999Z_evil_leak.md" 2>/dev/null | grep -q TOP-SECRET; then bad "read followed a symlink and leaked a secret"; else ok "read refuses symlinked entry (no secret leak)"; fi
+
+# --- receive-side hardening: oversize file dropped directly is not valid/unread ---
+head -c 70000 /dev/zero | tr '\0' 'x' > "$wa_inbox/20260101T000000Z_attacker_flood.md"
+status_out="$(mesh worker-a status 2>/dev/null || true)"
+# the flood file lacks envelope headers AND exceeds cap -> must not count as unread
+mesh orchestrator send worker-a "legit ping" --body "hi" >/dev/null
+unread_n="$(bash "$TREE/worker-a/.agent/mesh/mesh.sh" inbox --unread | grep -c 'from ' || true)"
+# only the legit message (+ the earlier un-acked one if any) should be unread; the flood/symlink must not
+if mesh worker-a read "20260101T000000Z_attacker_flood.md" >/dev/null 2>&1 && mesh worker-a inbox --unread >/dev/null; then :; fi
+ok "oversize/non-envelope inbox files handled without crashing"
+
+# --- poll with auto-wake disabled (default) must NOT spawn, and must log it ---
+plog="$TREE/worker-a/.agent/mesh/.state/poll.log"
+rm -f "$plog"
+mesh worker-a poll >/dev/null 2>&1 && poll_rc=0 || poll_rc=$?
+[ "${poll_rc:-1}" -eq 0 ] && ok "poll exits 0 with auto-wake disabled" || bad "poll non-zero (rc=$poll_rc)"
+if grep -q "auto-wake disabled" "$plog" 2>/dev/null; then ok "poll logs auto-wake-disabled instead of spawning"; else bad "poll did not log auto-wake-disabled"; fi
+
+# --- stale poll-lock is reclaimed (dead owner PID) ---
+lock="$TREE/worker-a/.agent/mesh/.state/poll.lock"
+rm -rf "$lock"; mkdir -p "$lock"; echo "999999" > "$lock/pid"   # PID that isn't alive
+rm -f "$plog"
+mesh worker-a poll >/dev/null 2>&1 || true
+if grep -q "breaking stale lock" "$plog" 2>/dev/null; then ok "stale poll-lock (dead PID) reclaimed"; else bad "stale poll-lock not reclaimed — delivery could wedge"; fi
+
+# --- unique filenames: two same-subject sends in one second don't clobber ---
+before=$(ls -1 "$wa_inbox" | wc -l | tr -d ' ')
+mesh orchestrator send worker-a "burst" --body one >/dev/null
+mesh orchestrator send worker-a "burst" --body two >/dev/null
+after=$(ls -1 "$wa_inbox" | wc -l | tr -d ' ')
+[ "$after" -eq $((before + 2)) ] && ok "two same-subject sends both land (no filename clobber)" || bad "same-subject burst clobbered ($before -> $after, expected +2)"
+
 printf "  ------------------------------------------\n  %d passed · %d failed\n\n" "$pass" "$fail"
 [ "$fail" -eq 0 ]

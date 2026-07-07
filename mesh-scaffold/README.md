@@ -76,25 +76,36 @@ woken session can't be prompt-injected into acting as the peer's puppet.
 .agent/mesh/mesh.sh ack <msg-id>         # confirm receipt to sender
 .agent/mesh/mesh.sh heartbeat working    # prove you're alive
 .agent/mesh/mesh.sh doctor               # peer liveness (CI-friendly exit)
-.agent/mesh/mesh.sh install-loop         # auto-wake on new mail (launchd/cron)
+.agent/mesh/mesh.sh install-loop         # schedule the poller (launchd/cron); wake is opt-in
 ```
 
 ## The loop (what `install-loop` schedules)
 
 Every `MESH_POLL_SECONDS` (default 300), `mesh.sh poll`:
 
-1. emits a heartbeat, and escalates any **dead** peer to the parent (once/day);
-2. compares the newest inbox file against `.state/last_poll_seen`;
-3. on new mail, spawns a fresh agent (`MESH_WAKE_CMD`, auto-detected
-   `claude → codex → aider`) with the trust-boundary prompt;
-4. advances the marker **only on exit 0**, so a failed wake retries next tick.
+1. takes a stale-aware lock (a crashed poll can't wedge delivery — a lock
+   whose owner PID is dead or that is older than 3× the interval is reclaimed);
+2. emits a heartbeat, and escalates any **dead** peer to the parent (once/day);
+3. computes the set of **unread, valid** messages (not a lexical watermark,
+   which would miss out-of-order arrivals);
+4. **if** auto-wake is enabled (`MESH_WAKE_CMD` set, or
+   `MESH_WAKE_ALLOW_DANGEROUS=1`), spawns a fresh agent with the
+   trust-boundary prompt; otherwise it just logs that mail is waiting;
+5. a message left unread after `MESH_MAX_WAKE_ATTEMPTS` (default 3) wakes is
+   dead-lettered (marked read + logged) so it can't re-wake forever.
 
-Session close: reply/ack what you handled, `heartbeat`, exit. The next wake —
-in this node or a peer — picks up from disk.
+The agent marks a message read by `read`-ing or `ack`-ing it. Session close:
+reply/ack what you handled, `heartbeat`, exit. The next wake picks up from disk.
 
 ## Safety defaults
 
-- **Opt-in.** Nothing polls, spawns, or writes to a peer until both nodes `init`.
-- **Sandboxed reach.** Peer paths resolve only within the ceiling; no traversal.
-- **Bounded.** Messages over `MESH_MAX_MSG_BYTES` (64 KB) are rejected.
-- **Idempotent.** Markers + read-flags make redelivery and re-wakes safe.
+- **Opt-in on both ends.** A node only *discovers* and *sends to* peers that
+  have `init`-ed. (Sending is filesystem write, though — see trust boundary
+  above; keep the mesh within a tree you trust.)
+- **Auto-wake is off by default.** Untrusted inbox content does not spawn an
+  agent until you explicitly set `MESH_WAKE_CMD` or `MESH_WAKE_ALLOW_DANGEROUS=1`.
+- **Validated on receipt.** Only regular files (symlinks skipped — no reading
+  a symlinked secret into context), within `MESH_MAX_MSG_BYTES` (64 KB), with a
+  real envelope, ever reach an agent or the wake trigger.
+- **Ceilinged reach.** Peer discovery never crosses `MESH_SCOPE_CEILING`.
+- **Idempotent.** Read-flags + unique message ids make redelivery and re-wakes safe.
