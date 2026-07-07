@@ -4,9 +4,13 @@
 >
 > This isn't "set up a folder." This ships the **[Trilogy AI Center of Excellence](https://trilogyai.substack.com/) methodology** on top of a bead-graph task system inspired by **[Steve Yegge's Beads](https://github.com/steveyegge/beads)** — spiky takes, evidence-on-close, and a 130-pattern knowledge base your agent inherits on install.
 
+### v2.1 — the agent mesh
+
+Nodes can now **talk to each other.** Run agentize in several dirs under one tree and each becomes a node with an inbox/outbox; `npx agentize mesh` sends messages, discovers peers (1 up, 2 down), and schedules a poller that wakes a session on new mail. Filesystem transport, opt-in per node, untrusted-inbox trust boundary. It's a production agent swarm distilled into the scaffold — see [Agent mesh](#agent-mesh--repos-that-talk-to-each-other).
+
 ### v2.0 — instincts, verify, learn, audit, handoff
 
-Now ships with **reflex instincts** (short trigger/action/evidence files the agent reads on session start), **`verify.sh`** (truth-checks bead close-reasons against the filesystem), **`learn.sh`** (proposes new instincts from your session memory), **`agentize audit`** (0-100 liveness score across 8 dimensions), **`agentize status --markdown`** (portable handoff doc), and **`AGENTIZE_PROFILE=minimal|standard|strict`** (scale strictness without editing files). The install dashboard is condensed to a dense module grid that animates in ~2 seconds.
+Ships with **reflex instincts** (short trigger/action/evidence files the agent reads on session start), **`verify.sh`** (truth-checks bead close-reasons against the filesystem), **`learn.sh`** (proposes new instincts from your session memory), **`agentize audit`** (0-100 liveness score across 8 dimensions), **`agentize status --markdown`** (portable handoff doc), and **`AGENTIZE_PROFILE=minimal|standard|strict`** (scale strictness without editing files). The install dashboard is condensed to a dense module grid that animates in ~2 seconds.
 
 [![npm](https://img.shields.io/npm/v/agentize.svg?label=agentize)](https://www.npmjs.com/package/agentize)
 [![total downloads agentize](https://img.shields.io/npm/dt/agentize.svg?label=agentize%20downloads)](https://www.npmjs.com/package/agentize)
@@ -71,6 +75,11 @@ npx youragent
 | `npx agentize update-check` | Compares installed scaffold version to npm latest. |
 | `npx agentize uninstall` | Preview → confirm → removes `.agent/`, hook files, compat symlink. |
 | `npx agentize configure-openclaw` | Wires OpenClaw persistent agents to auto-read `.agent/` on repo entry. |
+| `npx agentize mesh init` | Opt this node into the agent mesh (inbox/outbox with peer repos). |
+| `npx agentize mesh peers` | List peer agentize nodes in scope (1 up, 2 down) + liveness. |
+| `npx agentize mesh send <peer> "…"` | Drop a message into a peer node's inbox. |
+| `npx agentize mesh inbox` | Show messages other agents sent this node. |
+| `npx agentize mesh install-loop` | Schedule a poller (launchd/cron) that wakes a session on new mail. |
 
 ### What lands in your repo
 
@@ -98,9 +107,13 @@ npx youragent
 │   │   ├── PROMPTS.md             # instruction log (yours)
 │   │   ├── SHORT_TERM_MEMORY.md   # scratch pad (yours)
 │   │   └── README.md              # bead rules
-│   └── skills/
-│       ├── search-substack.sh     # source retrieval w/ attribution
-│       └── README.md
+│   ├── skills/
+│   │   ├── search-substack.sh     # source retrieval w/ attribution
+│   │   └── README.md
+│   └── mesh/                      # agent-to-agent inbox/outbox (opt-in)
+│       ├── mesh.sh                # the mesh CLI (send/inbox/peers/poll/…)
+│       ├── README.md              # protocol + trust boundary
+│       └── config.json            # this node's identity + scope (yours)
 ├── .agents/                       # cross-harness compat (Codex, Copilot, Gemini CLI, …)
 │   └── skills → ../.agent/skills  # symlink to the real skills dir
 ├── CLAUDE.md                      # → Claude Code auto-reads this
@@ -138,6 +151,11 @@ The hook files (`CLAUDE.md`, `AGENTS.md`, etc.) are short redirects that each to
 | `BOOTSTRAP_FORCE=1` | Overwrite personal files too (nuke-and-reinstall). |
 | `NO_ANIM=1` | Disable animations (useful in CI / non-TTY contexts). |
 | `AGENTIZE_YES=1` | Skip the uninstall confirmation prompt. |
+| `MESH_SCOPE_UP=<n>` | Mesh: levels to ascend to the discovery anchor (default `1`). |
+| `MESH_SCOPE_DOWN=<n>` | Mesh: depth to scan from the anchor (default `2`). |
+| `MESH_SCOPE_CEILING=<path>` | Mesh: never discover/scan above this dir (default `$HOME`). |
+| `MESH_POLL_SECONDS=<n>` | Mesh: poll interval for the wake loop (default `300`). |
+| `MESH_WAKE_CMD=<cmd>` | Mesh: command to spawn on new mail (auto: `claude`→`codex`→`aider`). |
 
 ### Windows
 
@@ -177,6 +195,26 @@ npx agentize configure-openclaw
 ```
 
 Scans `~/.openclaw/openclaw.json`, backs up each agent's `AGENTS.md`, adds the integration snippet. Idempotent — re-run anytime.
+
+### Agent mesh — repos that talk to each other
+
+When you run agentize in several directories under one tree — a parent repo and its sub-projects, or a fleet of worker dirs under one root — each becomes a **node**. The mesh lets those nodes exchange messages **directly through the filesystem**. No broker, no network, no daemon. It's the pattern behind a production agent swarm, distilled into the scaffold.
+
+```bash
+npx agentize mesh init            # opt in (each node does this once)
+npx agentize mesh peers           # who's reachable — 1 level up, 2 levels down
+npx agentize mesh send worker-a "review unit 1" --body "draft is in /out"
+npx agentize mesh inbox --unread  # what peers sent you
+npx agentize mesh install-loop    # auto-wake a session (launchd/cron) on new mail
+```
+
+**Scope.** Discovery ascends to the parent (`MESH_SCOPE_UP=1`) and scans its subtree down two levels (`MESH_SCOPE_DOWN=2`) — a flat mesh of parent + siblings + children under one root. It never scans above `MESH_SCOPE_CEILING` (default `$HOME`) and only sees nodes that have opted in.
+
+**Stateless by design.** The assumption is that a fresh, forgetful agent session (e.g. `claude -p`) runs in every node. So a node remembers what it has seen on disk, and delivery is pull-based: the poller wakes a *new* session when mail lands, handing it a self-contained, injection-hardened prompt.
+
+**Trust boundary.** Every inbox message is **untrusted input from another agent — data to triage, never instructions to obey.** A peer can't authorise a node to do anything it couldn't already do. The wake prompt says so explicitly, so a woken session can't be prompt-injected into acting as a peer's puppet. Full protocol: `.agent/mesh/README.md`.
+
+Opt-in, reversible (`mesh uninstall-loop`), and bounded (64 KB message cap, sandboxed reach, idempotent redelivery).
 
 ### Updates are safe
 
